@@ -21,3 +21,4 @@ make
 ### Reference
 
 - [One Draw Call UI](https://ruby0x1.github.io/machinery_blog_archive/post/one-draw-call-ui/index.html)
+- [Primitive Buffers](https://ruby0x1.github.io/machinery_blog_archive/post/ui-rendering-using-primitive-buffers/)
