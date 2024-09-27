@@ -1,0 +1,23 @@
+# odc
+
+I don't know what this is yet.
+I guess for now, it's a demonstration of drawing multiple 2D shapes in one draw call.
+
+
+## build
+
+This project uses opengl and glfw
+
+```
+apt-get install libglfw3
+apt-get install libglfw3-dev
+```
+
+```bash
+make
+./build/demo
+```
+
+### Reference
+
+- [One Draw Call UI](https://ruby0x1.github.io/machinery_blog_archive/post/one-draw-call-ui/index.html)
