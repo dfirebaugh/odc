@@ -1,7 +1,7 @@
 #ifndef RENDERER_H
 #define RENDERER_H
 
-#include "glad/glad.h"
+#include "glad.h"
 
 #define ATTRIB_POS_LOCATION 0
 #define ATTRIB_SHAPE_POS_LOCATION 1

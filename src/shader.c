@@ -1,4 +1,4 @@
-#include "glad/glad.h"
+#include "glad.h"
 
 #include <stdio.h>
 #include <stdlib.h>

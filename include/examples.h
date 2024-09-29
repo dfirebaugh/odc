@@ -2,7 +2,6 @@
 #define EXAMPLES_H
 
 #include "engine.h"
-#include "renderer.h"
 
 void init_triangles();
 void init_rounded_rects();

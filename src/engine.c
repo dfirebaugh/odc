@@ -1,4 +1,4 @@
-#include "glad/glad.h"
+#include "glad.h"
 #include <GLFW/glfw3.h>
 
 #include <stdio.h>
@@ -7,6 +7,14 @@
 #include "engine.h"
 #include "input.h"
 #include "renderer.h"
+
+struct engine {
+  GLFWwindow *window;
+  int window_width;
+  int window_height;
+  update_callback_t update_callback;
+  shape_renderer renderer;
+};
 
 void framebuffer_size_callback(GLFWwindow *window, int width, int height) {
   glViewport(0, 0, width, height);
@@ -75,6 +83,10 @@ void engine_destroy(struct engine *e) {
     free(e);
   }
   glfwTerminate();
+}
+
+struct GLFWwindow *engine_get_window(struct engine *e) {
+  return e->window;
 }
 
 void process_input(struct engine *e) { input_update(e); }

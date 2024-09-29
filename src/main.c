@@ -1,4 +1,4 @@
-#include "glad/glad.h"
+#include "glad.h"
 #include <GLFW/glfw3.h>
 
 #include <stdio.h>
@@ -8,8 +8,11 @@
 #include "input.h"
 
 void update(struct engine *e, shape_renderer *renderer, double delta_time) {
-  if (is_mouse_button_just_pressed(e->window, GLFW_MOUSE_BUTTON_LEFT)) {
-    printf("mouse left clicked\n");
+  GLFWwindow *window = engine_get_window(e);
+  if (is_mouse_button_just_pressed(window,
+                                   GLFW_MOUSE_BUTTON_LEFT)) {
+    struct MousePosition m = input_get_mouse_position(window);
+    printf("x: %d, y: %d\n", (int)m.x, (int)m.y);
   }
 
   example_update(e, renderer, delta_time);

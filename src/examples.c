@@ -1,18 +1,20 @@
 #include "engine.h"
 #include "input.h"
 #include "renderer.h"
+#include <GLFW/glfw3.h>
 
 void example_update(struct engine *e, shape_renderer *renderer,
                     double delta_time) {
+  struct GLFWwindow *window = engine_get_window(e);
   renderer->shape_count = 0;
 
   double xpos, ypos;
-  struct MousePosition mpos = input_get_mouse_position(e->window);
+  struct MousePosition mpos = input_get_mouse_position(window);
   xpos = mpos.x;
   ypos = mpos.y;
 
   int windowWidth, windowHeight;
-  glfwGetFramebufferSize(e->window, &windowWidth, &windowHeight);
+  glfwGetFramebufferSize(window, &windowWidth, &windowHeight);
 
   float rounded_rect_width = 200.0f;
   float rounded_rect_height = 150.0f;

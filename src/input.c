@@ -1,7 +1,5 @@
-#include "glad/glad.h"
+#include "glad.h"
 #include <GLFW/glfw3.h>
-
-#include <stdio.h>
 
 #include "engine.h"
 #include "input.h"
@@ -25,13 +23,14 @@ void input_init(GLFWwindow *window) {
 }
 
 void input_update(struct engine *e) {
+  struct GLFWwindow *window = engine_get_window(e);
   if (mouseCaptured) {
     double xpos, ypos;
-    glfwGetCursorPos(e->window, &xpos, &ypos);
-    handle_mouse_movement(e->window, xpos, ypos);
+    glfwGetCursorPos(window, &xpos, &ypos);
+    handle_mouse_movement(window, xpos, ypos);
   }
-  handle_close(e->window);
-  update_key_states(e->window);
+  handle_close(window);
+  update_key_states(window);
 }
 
 void handle_mouse_click(GLFWwindow *window, int button, int action, int mods) {
@@ -42,9 +41,9 @@ void handle_mouse_click(GLFWwindow *window, int button, int action, int mods) {
     if (button >= 0 && button < GLFW_MOUSE_BUTTON_LAST) {
       mouseStates[button] = 1;
     }
-    if (button == GLFW_MOUSE_BUTTON_LEFT) {
-      printf("Mouse clicked at position: (%f, %f)\n", xpos, ypos);
-    }
+    /*if (button == GLFW_MOUSE_BUTTON_LEFT) {*/
+    /*  printf("Mouse clicked at position: (%f, %f)\n", xpos, ypos);*/
+    /*}*/
   } else if (action == GLFW_RELEASE) {
     if (button >= 0 && button < GLFW_MOUSE_BUTTON_LAST) {
       mouseStates[button] = 0;

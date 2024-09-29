@@ -1,7 +1,7 @@
 #ifndef SHADER_H
 #define SHADER_H
 
-#include "glad/glad.h"
+#include "glad.h"
 
 GLuint new_program(const char *vertexShaderSource,
                    const char *fragmentShaderSource, char *error);
