@@ -6,6 +6,29 @@
 
 #include "renderer.h"
 #include "shader.h"
+// #include "stb_truetype.h"
+#include "font.h"
+
+struct vertex {
+  float fs_quad_pos[2];
+  float shape_pos[2];
+  float local_pos[2];
+  float op_code;
+  float radius;
+  float width;
+  float height;
+  float color[4];
+  float resolution[2];
+  float tex_coord[2];
+};
+
+struct renderer {
+  struct vertex vertices[MAX_SHAPES * 6];
+  unsigned int VAO, VBO;
+  int shape_count;
+  GLuint shader_program;
+  Font font;
+};
 
 void check_gl_errors() {
   GLenum err;
@@ -33,8 +56,8 @@ const char *vertexShaderSource =
     "layout(location = 5) in vec4 in_color;\n"
     "layout(location = 6) in float in_width;\n"
     "layout(location = 7) in float in_height;\n"
-
-    "uniform vec2 u_resolution;\n"
+    "layout(location = 8) in vec2 in_tex_coord;\n"
+    "layout(location = 9) in vec2 in_resolution;\n"
 
     "out vec2 local_pos;\n"
     "out float op_code;\n"
@@ -42,18 +65,23 @@ const char *vertexShaderSource =
     "out vec4 color;\n"
     "out float width;\n"
     "out float height;\n"
+    "out vec2 tex_coord;\n"
 
     "void main() {\n"
-    "    vec2 scaledShapePos = (in_shape_pos / u_resolution) * 2.0 - 1.0;\n"
-    "    scaledShapePos.y = -scaledShapePos.y;\n"
-    "    gl_Position = vec4(scaledShapePos + (in_local_pos / u_resolution) * "
-    "2.0, 0.0, 1.0);\n"
+    "    vec2 scaledShapePos = in_shape_pos;\n"
+    "    if (in_op_code == 4.0) { // Text rendering\n"
+    "        gl_Position = vec4(in_pos, 0.0, 1.0);\n"
+    "    } else {\n"
+    "        gl_Position = vec4(scaledShapePos + in_local_pos / in_resolution "
+    "* 2.0, 0.0, 1.0);\n"
+    "    }\n"
     "    local_pos = in_local_pos;\n"
     "    op_code = in_op_code;\n"
     "    radius = in_radius;\n"
     "    color = in_color;\n"
     "    width = in_width;\n"
     "    height = in_height;\n"
+    "    tex_coord = in_tex_coord;\n"
     "}\n";
 
 const char *fragmentShaderSource =
@@ -64,12 +92,16 @@ const char *fragmentShaderSource =
     "in vec4 color;\n"
     "in float width;\n"
     "in float height;\n"
+    "in vec2 tex_coord;\n"
 
     "out vec4 fragColor;\n"
+
+    "uniform sampler2D text;\n"
 
     "const float OP_CODE_CIRCLE = 1.0;\n"
     "const float OP_CODE_ROUNDED_RECT = 2.0;\n"
     "const float OP_CODE_TRIANGLE = 3.0;\n"
+    "const float OP_CODE_TEXT = 4.0;\n"
 
     "float sdCircle(vec2 p, float r) {\n"
     "    return length(p) - r;\n"
@@ -100,22 +132,32 @@ const char *fragmentShaderSource =
     "        if (sdf < 0.0) {\n"
     "            fragColor = color;\n"
     "        }\n"
-
     "    } else if (op_code == OP_CODE_ROUNDED_RECT) {\n"
     "        float sdf = sdRoundedRect(p, vec2(width, height) * 0.5, radius);\n"
     "        if (sdf < 0.0) {\n"
     "            fragColor = color;\n"
     "        }\n"
-
     "    } else if (op_code == OP_CODE_TRIANGLE) {\n"
-    "        float sdf = sdEquilateralTriangle(p / max(width, height)); \n"
+    "        float sdf = sdEquilateralTriangle(p / max(width, height));\n"
     "        if (sdf < 0.0) {\n"
     "            fragColor = color;\n"
     "        }\n"
+    "    } else if (op_code == OP_CODE_TEXT) {\n"
+    "        float sampled = texture(text, tex_coord).r;\n"
+    "        fragColor = vec4(color.rgb, sampled);\n"
     "    }\n"
     "}\n";
 
-void shape_renderer_init(shape_renderer *renderer) {
+struct renderer *renderer_new() {
+  return (struct renderer *)malloc(sizeof(struct renderer));
+}
+
+void renderer_init(struct renderer *renderer, const char *font_path) {
+  if (!renderer) {
+    fprintf(stderr, "Renderer pointer is null\n");
+    return;
+  }
+
   char error[256] = {0};
   GLuint shader_program =
       new_program(vertexShaderSource, fragmentShaderSource, error);
@@ -123,9 +165,6 @@ void shape_renderer_init(shape_renderer *renderer) {
     fprintf(stderr, "Shader compilation or linking error: %s\n", error);
     return;
   }
-
-  fprintf(stdout, "Shader program successfully created with ID: %d\n",
-          shader_program);
 
   renderer->shape_count = 0;
   renderer->shader_program = shader_program;
@@ -136,46 +175,76 @@ void shape_renderer_init(shape_renderer *renderer) {
   glBindVertexArray(renderer->VAO);
   glBindBuffer(GL_ARRAY_BUFFER, renderer->VBO);
 
-  glBufferData(GL_ARRAY_BUFFER, sizeof(vertex) * MAX_SHAPES * 6, NULL,
+  glBufferData(GL_ARRAY_BUFFER, sizeof(struct vertex) * MAX_SHAPES * 6, NULL,
                GL_DYNAMIC_DRAW);
 
   glVertexAttribPointer(ATTRIB_POS_LOCATION, 2, GL_FLOAT, GL_FALSE,
-                        sizeof(vertex), (void *)offsetof(vertex, fs_quad_pos));
+                        sizeof(struct vertex),
+                        (void *)offsetof(struct vertex, fs_quad_pos));
   glEnableVertexAttribArray(ATTRIB_POS_LOCATION);
 
   glVertexAttribPointer(ATTRIB_SHAPE_POS_LOCATION, 2, GL_FLOAT, GL_FALSE,
-                        sizeof(vertex), (void *)offsetof(vertex, shape_pos));
+                        sizeof(struct vertex),
+                        (void *)offsetof(struct vertex, shape_pos));
   glEnableVertexAttribArray(ATTRIB_SHAPE_POS_LOCATION);
 
   glVertexAttribPointer(ATTRIB_LOCAL_POS_LOCATION, 2, GL_FLOAT, GL_FALSE,
-                        sizeof(vertex), (void *)offsetof(vertex, local_pos));
+                        sizeof(struct vertex),
+                        (void *)offsetof(struct vertex, local_pos));
   glEnableVertexAttribArray(ATTRIB_LOCAL_POS_LOCATION);
 
   glVertexAttribPointer(ATTRIB_OPCODE_LOCATION, 1, GL_FLOAT, GL_FALSE,
-                        sizeof(vertex), (void *)offsetof(vertex, op_code));
+                        sizeof(struct vertex),
+                        (void *)offsetof(struct vertex, op_code));
   glEnableVertexAttribArray(ATTRIB_OPCODE_LOCATION);
 
   glVertexAttribPointer(ATTRIB_RADIUS_LOCATION, 1, GL_FLOAT, GL_FALSE,
-                        sizeof(vertex), (void *)offsetof(vertex, radius));
+                        sizeof(struct vertex),
+                        (void *)offsetof(struct vertex, radius));
   glEnableVertexAttribArray(ATTRIB_RADIUS_LOCATION);
 
   glVertexAttribPointer(ATTRIB_COLOR_LOCATION, 4, GL_FLOAT, GL_FALSE,
-                        sizeof(vertex), (void *)offsetof(vertex, color));
+                        sizeof(struct vertex),
+                        (void *)offsetof(struct vertex, color));
   glEnableVertexAttribArray(ATTRIB_COLOR_LOCATION);
 
   glVertexAttribPointer(ATTRIB_WIDTH_LOCATION, 1, GL_FLOAT, GL_FALSE,
-                        sizeof(vertex), (void *)offsetof(vertex, width));
+                        sizeof(struct vertex),
+                        (void *)offsetof(struct vertex, width));
   glEnableVertexAttribArray(ATTRIB_WIDTH_LOCATION);
 
   glVertexAttribPointer(ATTRIB_HEIGHT_LOCATION, 1, GL_FLOAT, GL_FALSE,
-                        sizeof(vertex), (void *)offsetof(vertex, height));
+                        sizeof(struct vertex),
+                        (void *)offsetof(struct vertex, height));
   glEnableVertexAttribArray(ATTRIB_HEIGHT_LOCATION);
+
+  glVertexAttribPointer(ATTRIB_TEX_COORD_LOCATION, 2, GL_FLOAT, GL_FALSE,
+                        sizeof(struct vertex),
+                        (void *)offsetof(struct vertex, tex_coord));
+  glEnableVertexAttribArray(ATTRIB_TEX_COORD_LOCATION);
+
+  glVertexAttribPointer(ATTRIB_RESOLUTION_LOCATION, 2, GL_FLOAT, GL_FALSE,
+                        sizeof(struct vertex),
+                        (void *)offsetof(struct vertex, resolution));
+  glEnableVertexAttribArray(ATTRIB_RESOLUTION_LOCATION);
 
   glBindBuffer(GL_ARRAY_BUFFER, 0);
   glBindVertexArray(0);
+
+  if (font_load(font_path, &renderer->font) != 0) {
+    fprintf(stderr, "Failed to load font\n");
+    return;
+  }
 }
 
-void shape_renderer_draw(shape_renderer *renderer) {
+GLuint renderer_get_shader(struct renderer *renderer) {
+  return renderer->shader_program;
+}
+
+void renderer_reset_shape_count(struct renderer *renderer) {
+  renderer->shape_count = 0;
+}
+void renderer_draw(struct renderer *renderer) {
   check_gl_errors();
 
   glUseProgram(renderer->shader_program);
@@ -191,9 +260,13 @@ void shape_renderer_draw(shape_renderer *renderer) {
 
   glBindBuffer(GL_ARRAY_BUFFER, renderer->VBO);
   glBufferSubData(GL_ARRAY_BUFFER, 0,
-                  sizeof(vertex) * renderer->shape_count * 6,
+                  sizeof(struct vertex) * renderer->shape_count * 6,
                   renderer->vertices);
   check_gl_errors();
+
+  glActiveTexture(GL_TEXTURE0);
+  glBindTexture(GL_TEXTURE_2D, renderer->font.texture_id);
+  glUniform1i(glGetUniformLocation(renderer->shader_program, "text"), 0);
 
   glDrawArrays(GL_TRIANGLES, 0, renderer->shape_count * 6);
   check_gl_errors();
@@ -203,13 +276,13 @@ void shape_renderer_draw(shape_renderer *renderer) {
 
 void normalize_coordinates(float x, float y, int screen_width,
                            int screen_height, float *norm_x, float *norm_y) {
-  *norm_x = x;
-  *norm_y = y;
+  *norm_x = (x / (float)screen_width) * 2.0f - 1.0f;
+  *norm_y = 1.0f - (y / (float)screen_height) * 2.0f;
 }
 
-void shape_renderer_add_triangle(shape_renderer *renderer, float x, float y,
-                                 float size, int screen_width,
-                                 int screen_height, float *color) {
+void renderer_add_triangle(struct renderer *renderer, float x, float y,
+                           float size, int screen_width, int screen_height,
+                           float *color) {
   if (renderer->shape_count >= MAX_SHAPES)
     return;
 
@@ -219,14 +292,12 @@ void shape_renderer_add_triangle(shape_renderer *renderer, float x, float y,
   float half_size = size / 2.0f;
   float height = size;
 
-  float vertices[12] = {-half_size,     -height / 2.0f, half_size,
-                        -height / 2.0f, 0.0f,           height / 2.0f,
-
-                        -half_size,     -height / 2.0f, half_size,
-                        -height / 2.0f, 0.0f,           height / 2.0f};
+  float vertices[12] = {-half_size, -height / 2.0f, half_size,  -height / 2.0f,
+                        0.0f,       height / 2.0f,  -half_size, -height / 2.0f,
+                        half_size,  -height / 2.0f, 0.0f,       height / 2.0f};
 
   for (int i = 0; i < 6; ++i) {
-    vertex *v = &renderer->vertices[renderer->shape_count * 6 + i];
+    struct vertex *v = &renderer->vertices[renderer->shape_count * 6 + i];
 
     v->fs_quad_pos[0] = vertices[i * 2];
     v->fs_quad_pos[1] = vertices[i * 2 + 1];
@@ -244,14 +315,17 @@ void shape_renderer_add_triangle(shape_renderer *renderer, float x, float y,
 
     for (int j = 0; j < 4; ++j)
       v->color[j] = color[j];
+
+    v->resolution[0] = (float)screen_width;
+    v->resolution[1] = (float)screen_height;
   }
 
   renderer->shape_count++;
 }
 
-void shape_renderer_add_circle(shape_renderer *renderer, float x, float y,
-                               float radius, int screen_width,
-                               int screen_height, float *color) {
+void renderer_add_circle(struct renderer *renderer, float x, float y,
+                         float radius, int screen_width, int screen_height,
+                         float *color) {
   if (renderer->shape_count >= MAX_SHAPES)
     return;
 
@@ -259,11 +333,10 @@ void shape_renderer_add_circle(shape_renderer *renderer, float x, float y,
   normalize_coordinates(x, y, screen_width, screen_height, &norm_x, &norm_y);
 
   float vertices[12] = {-radius, radius, -radius, -radius, radius, -radius,
-
                         -radius, radius, radius,  -radius, radius, radius};
 
   for (int i = 0; i < 6; ++i) {
-    vertex *v = &renderer->vertices[renderer->shape_count * 6 + i];
+    struct vertex *v = &renderer->vertices[renderer->shape_count * 6 + i];
 
     v->fs_quad_pos[0] = vertices[i * 2];
     v->fs_quad_pos[1] = vertices[i * 2 + 1];
@@ -281,14 +354,17 @@ void shape_renderer_add_circle(shape_renderer *renderer, float x, float y,
 
     for (int j = 0; j < 4; ++j)
       v->color[j] = color[j];
+
+    v->resolution[0] = (float)screen_width;
+    v->resolution[1] = (float)screen_height;
   }
   renderer->shape_count++;
 }
 
-void shape_renderer_add_rounded_rect(shape_renderer *renderer, float x, float y,
-                                     float width, float height, float radius,
-                                     int screen_width, int screen_height,
-                                     float *color) {
+void renderer_add_rounded_rect(struct renderer *renderer, float x, float y,
+                               float width, float height, float radius,
+                               int screen_width, int screen_height,
+                               float *color) {
   if (renderer->shape_count >= MAX_SHAPES)
     return;
 
@@ -298,14 +374,12 @@ void shape_renderer_add_rounded_rect(shape_renderer *renderer, float x, float y,
   float half_width = width * 0.5f;
   float half_height = height * 0.5f;
 
-  float vertices[12] = {-half_width,  half_height, -half_width,
-                        -half_height, half_width,  -half_height,
-
-                        -half_width,  half_height, half_width,
-                        -half_height, half_width,  half_height};
+  float vertices[12] = {-half_width, half_height,  -half_width, -half_height,
+                        half_width,  -half_height, -half_width, half_height,
+                        half_width,  -half_height, half_width,  half_height};
 
   for (int i = 0; i < 6; ++i) {
-    vertex *v = &renderer->vertices[renderer->shape_count * 6 + i];
+    struct vertex *v = &renderer->vertices[renderer->shape_count * 6 + i];
 
     v->fs_quad_pos[0] = vertices[i * 2];
     v->fs_quad_pos[1] = vertices[i * 2 + 1];
@@ -323,6 +397,67 @@ void shape_renderer_add_rounded_rect(shape_renderer *renderer, float x, float y,
 
     for (int j = 0; j < 4; ++j)
       v->color[j] = color[j];
+
+    v->resolution[0] = (float)screen_width;
+    v->resolution[1] = (float)screen_height;
   }
   renderer->shape_count++;
+}
+
+void renderer_add_text(struct renderer *renderer, const char *text, float x,
+                       float y, float scale, int screen_width,
+                       int screen_height, float *color) {
+  if (renderer->shape_count >= MAX_SHAPES)
+    return;
+
+  for (const char *c = text; *c; c++) {
+    stbtt_bakedchar *b = &renderer->font.cdata[*c - 32];
+
+    float xpos = x + b->xoff * scale;
+    float ypos = y + b->yoff * scale;
+
+    float w = (b->x1 - b->x0) * scale;
+    float h = (b->y1 - b->y0) * scale;
+
+    float tex_x0 = b->x0 / 512.0f;
+    float tex_y0 = b->y1 / 512.0f;
+    float tex_x1 = b->x1 / 512.0f;
+    float tex_y1 = b->y0 / 512.0f;
+
+    float vertices[24] = {
+        xpos,     ypos,     tex_x0, tex_y1, xpos,     ypos + h, tex_x0, tex_y0,
+        xpos + w, ypos + h, tex_x1, tex_y0, xpos,     ypos,     tex_x0, tex_y1,
+        xpos + w, ypos + h, tex_x1, tex_y0, xpos + w, ypos,     tex_x1, tex_y1};
+
+    for (int i = 0; i < 6; ++i) {
+      struct vertex *v = &renderer->vertices[renderer->shape_count * 6 + i];
+
+      normalize_coordinates(vertices[i * 4], vertices[i * 4 + 1], screen_width,
+                            screen_height, &v->fs_quad_pos[0],
+                            &v->fs_quad_pos[1]);
+
+      v->shape_pos[0] = 0.0f;
+      v->shape_pos[1] = 0.0f;
+
+      v->local_pos[0] = vertices[i * 4];
+      v->local_pos[1] = vertices[i * 4 + 1];
+
+      v->op_code = OP_CODE_TEXT;
+      v->radius = 0.0f;
+      v->width = w;
+      v->height = h;
+
+      for (int j = 0; j < 4; ++j)
+        v->color[j] = color[j];
+
+      v->resolution[0] = (float)screen_width;
+      v->resolution[1] = (float)screen_height;
+
+      v->tex_coord[0] = vertices[i * 4 + 2];
+      v->tex_coord[1] = vertices[i * 4 + 3];
+    }
+
+    renderer->shape_count++;
+    x += (b->xadvance) * scale;
+  }
 }

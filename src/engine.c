@@ -13,7 +13,7 @@ struct engine {
   int window_width;
   int window_height;
   update_callback_t update_callback;
-  shape_renderer renderer;
+  struct renderer *renderer;
 };
 
 void framebuffer_size_callback(GLFWwindow *window, int width, int height) {
@@ -43,15 +43,14 @@ struct engine *engine_new(int width, int height) {
   }
 
   set_default_window_size(e, width, height);
-  printf("Using window size: %dx%d\n", e->window_width, e->window_height);
 
   glfwWindowHint(GLFW_RESIZABLE, 1);
   glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-  e->window = glfwCreateWindow(e->window_width, e->window_height,
-                               "Hello OpenGL", NULL, NULL);
+  e->window =
+      glfwCreateWindow(e->window_width, e->window_height, "odc", NULL, NULL);
   if (!e->window) {
     fprintf(stderr, "Failed to create GLFW window\n");
     glfwTerminate();
@@ -72,6 +71,18 @@ struct engine *engine_new(int width, int height) {
   glViewport(0, 0, e->window_width, e->window_height);
   glfwSetFramebufferSizeCallback(e->window, framebuffer_size_callback);
 
+  e->renderer = renderer_new();
+  if (!e->renderer) {
+    fprintf(stderr, "Failed to allocate memory for renderer\n");
+    glfwDestroyWindow(e->window);
+    glfwTerminate();
+    free(e);
+    return NULL;
+  }
+  renderer_init(
+      e->renderer,
+      "./assets/fonts/ComicShannsMono/ComicShannsMonoNerdFont-Bold.otf");
+
   return e;
 }
 
@@ -85,14 +96,16 @@ void engine_destroy(struct engine *e) {
   glfwTerminate();
 }
 
-struct GLFWwindow *engine_get_window(struct engine *e) {
-  return e->window;
-}
+struct GLFWwindow *engine_get_window(struct engine *e) { return e->window; }
 
 void process_input(struct engine *e) { input_update(e); }
 
 void engine_run(struct engine *e) {
-  shape_renderer_init(&e->renderer);
+  if (!e->renderer) {
+    fprintf(stderr, "Renderer is not initialized\n");
+    return;
+  }
+
   input_init(e->window);
 
   double lastTime = glfwGetTime();
@@ -106,13 +119,13 @@ void engine_run(struct engine *e) {
     double deltaTime = currentTime - lastTime;
 
     if (e->update_callback) {
-      e->update_callback(e, &e->renderer, deltaTime);
+      e->update_callback(e, e->renderer, deltaTime);
     }
     frameCount++;
 
     if (currentTime - lastTime >= 1.0) {
       char title[256];
-      snprintf(title, sizeof(title), "Hello OpenGL - FPS: %d", frameCount);
+      snprintf(title, sizeof(title), "odc - FPS: %d", frameCount);
       glfwSetWindowTitle(e->window, title);
 
       frameCount = 0;
@@ -124,17 +137,13 @@ void engine_run(struct engine *e) {
     glfwGetFramebufferSize(e->window, &windowWidth, &windowHeight);
     float aspect_ratio = (float)windowWidth / (float)windowHeight;
 
-    glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
+    glClearColor(41.0f / 255.0f, 44.0f / 255.0f, 60.0f / 255.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    glUseProgram(e->renderer.shader_program);
-    check_gl_errors();
-    glUniform1f(
-        glGetUniformLocation(e->renderer.shader_program, "aspect_ratio"),
-        aspect_ratio);
+    glUseProgram(renderer_get_shader(e->renderer));
     check_gl_errors();
 
-    shape_renderer_draw(&e->renderer);
+    renderer_draw(e->renderer);
     check_gl_errors();
 
     glfwSwapBuffers(e->window);

@@ -4,7 +4,7 @@
 #include "glad.h"
 #include <GLFW/glfw3.h>
 
-#include "engine.h"
+struct engine;
 
 extern double lastX;
 extern double lastY;

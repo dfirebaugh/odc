@@ -1,12 +1,10 @@
-
 #ifndef ENGINE_H
 #define ENGINE_H
 
-#include "renderer.h"
-
 struct engine;
+struct renderer;
 
-typedef void (*update_callback_t)(struct engine *e, shape_renderer *renderer,
+typedef void (*update_callback_t)(struct engine *e, struct renderer *renderer,
                                   double delta_time);
 
 struct engine *engine_new(int width, int height);

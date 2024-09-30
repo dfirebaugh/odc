@@ -7,15 +7,16 @@
 #include "examples.h"
 #include "input.h"
 
-void update(struct engine *e, shape_renderer *renderer, double delta_time) {
+void update(struct engine *e, struct renderer *renderer, double delta_time) {
   GLFWwindow *window = engine_get_window(e);
-  if (is_mouse_button_just_pressed(window,
-                                   GLFW_MOUSE_BUTTON_LEFT)) {
+  if (is_mouse_button_just_pressed(window, GLFW_MOUSE_BUTTON_LEFT)) {
     struct MousePosition m = input_get_mouse_position(window);
     printf("x: %d, y: %d\n", (int)m.x, (int)m.y);
   }
 
   example_update(e, renderer, delta_time);
+  /*stress_test_example_update(e, renderer, delta_time);*/
+  /*text_fill_example_update(e, renderer, delta_time);*/
 }
 
 int main() {
