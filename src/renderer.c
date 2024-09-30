@@ -4,10 +4,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "font.h"
 #include "renderer.h"
 #include "shader.h"
-// #include "stb_truetype.h"
-#include "font.h"
 
 struct vertex {
   float fs_quad_pos[2];
