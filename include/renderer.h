@@ -16,17 +16,41 @@
 
 #define OP_CODE_CIRCLE 1.0f
 #define OP_CODE_ROUNDED_RECT 2.0f
-#define OP_CODE_TRIANGLE 3.0f
-#define OP_CODE_TEXT 4.0f
+#define OP_CODE_EQUILATERAL_TRIANGLE 3.0f
+#define OP_CODE_TRIANGLE 4.0f
+#define OP_CODE_TEXT 5.0f
+#define OP_CODE_TEXTURE 6.0f
 
-#define MAX_SHAPES 20000
+#define MAX_SHAPES 400000
 struct renderer;
+
+struct TextureRenderOptions {
+  float x;
+  float y;
+  float width;
+  float height;
+  float rect_x;
+  float rect_y;
+  float rect_width;
+  float rect_height;
+  int screen_width;
+  int screen_height;
+  int flip_x;
+  int flip_y;
+  float scale;
+  float rotation;
+};
 
 struct renderer *renderer_new();
 void renderer_init(struct renderer *renderer, const char *font_path);
 void renderer_destroy(struct renderer *renderer);
-GLuint renderer_get_shader(struct renderer *renderer);
+void renderer_draw(struct renderer *renderer);
+void renderer_clear(struct renderer *renderer, float r, float g, float b,
+                    float a);
+void renderer_clear_vertices(struct renderer *renderer);
 void renderer_reset_shape_count(struct renderer *renderer);
+GLuint renderer_get_shader(struct renderer *renderer);
+
 void renderer_add_circle(struct renderer *renderer, float x, float y,
                          float radius, int screen_width, int screen_height,
                          float *color);
@@ -34,14 +58,22 @@ void renderer_add_rounded_rect(struct renderer *renderer, float x, float y,
                                float width, float height, float radius,
                                int screen_width, int screen_height,
                                float *color);
-void renderer_add_triangle(struct renderer *renderer, float x, float y,
-                           float size, int screen_width, int screen_height,
-                           float *color);
-void renderer_draw(struct renderer *renderer);
+void renderer_add_equilateral_triangle(struct renderer *renderer, float x,
+                                       float y, float size, int screen_width,
+                                       int screen_height, float *color);
+void renderer_add_triangle(struct renderer *renderer, float x1, float y1,
+                           float x2, float y2, float x3, float y3,
+                           int screen_width, int screen_height, float *color);
 void renderer_add_text(struct renderer *renderer, const char *text, float x,
                        float y, float scale, int screen_width,
                        int screen_height, float *color);
 
+void renderer_add_texture(struct renderer *renderer,
+                          struct TextureRenderOptions *options);
+
+void renderer_upload_texture_atlas(struct renderer *renderer,
+                                   const unsigned char *data, int width,
+                                   int height);
 void check_gl_errors();
 
 #endif // RENDERER_H

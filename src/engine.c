@@ -14,6 +14,7 @@ struct engine {
   int window_height;
   update_callback_t update_callback;
   struct renderer *renderer;
+  int fps;
 };
 
 void framebuffer_size_callback(GLFWwindow *window, int width, int height) {
@@ -83,6 +84,8 @@ struct engine *engine_new(int width, int height) {
       e->renderer,
       "./assets/fonts/ComicShannsMono/ComicShannsMonoNerdFont-Bold.otf");
 
+  e->fps = 0;
+
   return e;
 }
 
@@ -98,6 +101,8 @@ void engine_destroy(struct engine *e) {
 
 struct GLFWwindow *engine_get_window(struct engine *e) { return e->window; }
 
+struct renderer *engine_get_renderer(struct engine *e) { return e->renderer; }
+
 void process_input(struct engine *e) { input_update(e); }
 
 void engine_run(struct engine *e) {
@@ -109,7 +114,10 @@ void engine_run(struct engine *e) {
   input_init(e->window);
 
   double lastTime = glfwGetTime();
+  double lastTitleUpdateTime = lastTime;
+  double lastLogTime = lastTime;
   int frameCount = 0;
+  double totalFrameTime = 0.0;
 
   glEnable(GL_BLEND);
   glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -117,19 +125,22 @@ void engine_run(struct engine *e) {
   while (!glfwWindowShouldClose(e->window)) {
     double currentTime = glfwGetTime();
     double deltaTime = currentTime - lastTime;
+    lastTime = currentTime;
+
+    double startTime = glfwGetTime();
 
     if (e->update_callback) {
       e->update_callback(e, e->renderer, deltaTime);
     }
+
+    double updateTime = glfwGetTime();
+
     frameCount++;
 
-    if (currentTime - lastTime >= 1.0) {
-      char title[256];
-      snprintf(title, sizeof(title), "odc - FPS: %d", frameCount);
-      glfwSetWindowTitle(e->window, title);
-
+    if (currentTime - lastTitleUpdateTime >= 1.0) {
+      e->fps = frameCount;
       frameCount = 0;
-      lastTime = currentTime;
+      lastTitleUpdateTime = currentTime;
     }
 
     process_input(e);
@@ -137,8 +148,10 @@ void engine_run(struct engine *e) {
     glfwGetFramebufferSize(e->window, &windowWidth, &windowHeight);
     float aspect_ratio = (float)windowWidth / (float)windowHeight;
 
-    glClearColor(41.0f / 255.0f, 44.0f / 255.0f, 60.0f / 255.0f, 1.0f);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    renderer_clear(e->renderer, 41.0f / 255.0f, 44.0f / 255.0f, 60.0f / 255.0f,
+                   1.0f);
+
+    double clearTime = glfwGetTime();
 
     glUseProgram(renderer_get_shader(e->renderer));
     check_gl_errors();
@@ -146,7 +159,12 @@ void engine_run(struct engine *e) {
     renderer_draw(e->renderer);
     check_gl_errors();
 
+    double drawTime = glfwGetTime();
+
+    double swapStartTime = glfwGetTime();
     glfwSwapBuffers(e->window);
+    double swapEndTime = glfwGetTime();
+
     glfwPollEvents();
   }
 }
@@ -154,3 +172,5 @@ void engine_run(struct engine *e) {
 void engine_set_update_callback(struct engine *e, update_callback_t callback) {
   e->update_callback = callback;
 }
+
+int engine_get_fps(struct engine *e) { return e->fps; }

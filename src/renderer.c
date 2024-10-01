@@ -1,12 +1,14 @@
 #include "glad.h"
 #include <GLFW/glfw3.h>
 
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 
 #include "font.h"
 #include "renderer.h"
 #include "shader.h"
+#include "string.h"
 
 struct vertex {
   float fs_quad_pos[2];
@@ -27,6 +29,7 @@ struct renderer {
   int shape_count;
   GLuint shader_program;
   Font font;
+  GLuint atlas_id;
 };
 
 void check_gl_errors() {
@@ -68,7 +71,7 @@ const char *vertexShaderSource =
 
     "void main() {\n"
     "    vec2 scaledShapePos = in_shape_pos;\n"
-    "    if (in_op_code == 4.0) { // Text rendering\n"
+    "    if (in_op_code == 4.0 || in_op_code == 5.0) {\n"
     "        gl_Position = vec4(in_pos, 0.0, 1.0);\n"
     "    } else {\n"
     "        gl_Position = vec4(scaledShapePos + in_local_pos / in_resolution "
@@ -96,11 +99,14 @@ const char *fragmentShaderSource =
     "out vec4 fragColor;\n"
 
     "uniform sampler2D text;\n"
+    "uniform sampler2D texture_sampler;\n"
 
     "const float OP_CODE_CIRCLE = 1.0;\n"
     "const float OP_CODE_ROUNDED_RECT = 2.0;\n"
     "const float OP_CODE_TRIANGLE = 3.0;\n"
-    "const float OP_CODE_TEXT = 4.0;\n"
+    "const float OP_CODE_REGULAR_TRIANGLE = 4.0;\n"
+    "const float OP_CODE_TEXT = 5.0;\n"
+    "const float OP_CODE_TEXTURE = 6.0;\n"
 
     "float sdCircle(vec2 p, float r) {\n"
     "    return length(p) - r;\n"
@@ -141,9 +147,13 @@ const char *fragmentShaderSource =
     "        if (sdf < 0.0) {\n"
     "            fragColor = color;\n"
     "        }\n"
+    "    } else if (op_code == OP_CODE_REGULAR_TRIANGLE) {\n"
+    "        fragColor = color;\n"
     "    } else if (op_code == OP_CODE_TEXT) {\n"
     "        float sampled = texture(text, tex_coord).r;\n"
     "        fragColor = vec4(color.rgb, sampled);\n"
+    "    } else if (op_code == OP_CODE_TEXTURE) {\n"
+    "        fragColor = texture(texture_sampler, tex_coord);\n"
     "    }\n"
     "}\n";
 
@@ -243,6 +253,7 @@ GLuint renderer_get_shader(struct renderer *renderer) {
 void renderer_reset_shape_count(struct renderer *renderer) {
   renderer->shape_count = 0;
 }
+
 void renderer_draw(struct renderer *renderer) {
   check_gl_errors();
 
@@ -267,10 +278,25 @@ void renderer_draw(struct renderer *renderer) {
   glBindTexture(GL_TEXTURE_2D, renderer->font.texture_id);
   glUniform1i(glGetUniformLocation(renderer->shader_program, "text"), 0);
 
+  glActiveTexture(GL_TEXTURE1);
+  glBindTexture(GL_TEXTURE_2D, renderer->atlas_id);
+  glUniform1i(glGetUniformLocation(renderer->shader_program, "texture_sampler"),
+              1);
+
   glDrawArrays(GL_TRIANGLES, 0, renderer->shape_count * 6);
   check_gl_errors();
 
   glBindVertexArray(0);
+}
+
+void renderer_clear_vertices(struct renderer *renderer) {
+  memset(renderer->vertices, 0, sizeof(renderer->vertices));
+}
+
+void renderer_clear(struct renderer *renderer, float r, float g, float b,
+                    float a) {
+  glClearColor(r, g, b, a);
+  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 }
 
 void normalize_coordinates(float x, float y, int screen_width,
@@ -279,9 +305,9 @@ void normalize_coordinates(float x, float y, int screen_width,
   *norm_y = 1.0f - (y / (float)screen_height) * 2.0f;
 }
 
-void renderer_add_triangle(struct renderer *renderer, float x, float y,
-                           float size, int screen_width, int screen_height,
-                           float *color) {
+void renderer_add_equilateral_triangle(struct renderer *renderer, float x,
+                                       float y, float size, int screen_width,
+                                       int screen_height, float *color) {
   if (renderer->shape_count >= MAX_SHAPES)
     return;
 
@@ -307,10 +333,53 @@ void renderer_add_triangle(struct renderer *renderer, float x, float y,
     v->local_pos[0] = vertices[i * 2];
     v->local_pos[1] = vertices[i * 2 + 1];
 
-    v->op_code = OP_CODE_TRIANGLE;
+    v->op_code = OP_CODE_EQUILATERAL_TRIANGLE;
     v->radius = 0.0f;
     v->width = size;
     v->height = size;
+
+    for (int j = 0; j < 4; ++j)
+      v->color[j] = color[j];
+
+    v->resolution[0] = (float)screen_width;
+    v->resolution[1] = (float)screen_height;
+  }
+
+  renderer->shape_count++;
+}
+
+void renderer_add_triangle(struct renderer *renderer, float x1, float y1,
+                           float x2, float y2, float x3, float y3,
+                           int screen_width, int screen_height, float *color) {
+  if (renderer->shape_count >= MAX_SHAPES)
+    return;
+
+  float norm_x1, norm_y1, norm_x2, norm_y2, norm_x3, norm_y3;
+  normalize_coordinates(x1, y1, screen_width, screen_height, &norm_x1,
+                        &norm_y1);
+  normalize_coordinates(x2, y2, screen_width, screen_height, &norm_x2,
+                        &norm_y2);
+  normalize_coordinates(x3, y3, screen_width, screen_height, &norm_x3,
+                        &norm_y3);
+
+  float vertices[6] = {norm_x1, norm_y1, norm_x2, norm_y2, norm_x3, norm_y3};
+
+  for (int i = 0; i < 3; ++i) {
+    struct vertex *v = &renderer->vertices[renderer->shape_count * 6 + i];
+
+    v->fs_quad_pos[0] = vertices[i * 2];
+    v->fs_quad_pos[1] = vertices[i * 2 + 1];
+
+    v->shape_pos[0] = 0.0f;
+    v->shape_pos[1] = 0.0f;
+
+    v->local_pos[0] = vertices[i * 2];
+    v->local_pos[1] = vertices[i * 2 + 1];
+
+    v->op_code = OP_CODE_TRIANGLE;
+    v->radius = 0.0f;
+    v->width = 0.0f;
+    v->height = 0.0f;
 
     for (int j = 0; j < 4; ++j)
       v->color[j] = color[j];
@@ -459,4 +528,89 @@ void renderer_add_text(struct renderer *renderer, const char *text, float x,
     renderer->shape_count++;
     x += (b->xadvance) * scale;
   }
+}
+
+void renderer_add_texture(struct renderer *renderer,
+                          struct TextureRenderOptions *options) {
+  if (renderer->shape_count >= MAX_SHAPES)
+    return;
+
+  float norm_x, norm_y;
+  normalize_coordinates(options->x, options->y, options->screen_width,
+                        options->screen_height, &norm_x, &norm_y);
+
+  float half_width = options->rect_width * 0.5f * options->scale;
+  float half_height = options->rect_height * 0.5f * options->scale;
+
+  float u0 = options->rect_x / options->width;
+  float v0 = options->rect_y / options->height;
+  float u1 = (options->rect_x + options->rect_width) / options->width;
+  float v1 = (options->rect_y + options->rect_height) / options->height;
+
+  if (options->flip_x) {
+    float temp = u0;
+    u0 = u1;
+    u1 = temp;
+  }
+
+  if (options->flip_y) {
+    float temp = v0;
+    v0 = v1;
+    v1 = temp;
+  }
+
+  float vertices[24] = {
+      -half_width, half_height,  u0, v1, -half_width, -half_height, u0, v0,
+      half_width,  -half_height, u1, v0, -half_width, half_height,  u0, v1,
+      half_width,  -half_height, u1, v0, half_width,  half_height,  u1, v1};
+
+  float cos_theta = cosf(options->rotation);
+  float sin_theta = sinf(options->rotation);
+
+  for (int i = 0; i < 6; ++i) {
+    struct vertex *v = &renderer->vertices[renderer->shape_count * 6 + i];
+
+    float local_x = vertices[i * 4];
+    float local_y = vertices[i * 4 + 1];
+
+    float rotated_x = local_x * cos_theta - local_y * sin_theta;
+    float rotated_y = local_x * sin_theta + local_y * cos_theta;
+
+    v->fs_quad_pos[0] = rotated_x;
+    v->fs_quad_pos[1] = rotated_y;
+
+    v->shape_pos[0] = norm_x;
+    v->shape_pos[1] = norm_y;
+
+    v->local_pos[0] = rotated_x;
+    v->local_pos[1] = rotated_y;
+
+    v->op_code = OP_CODE_TEXTURE;
+    v->radius = 0.0f;
+    v->width = options->width;
+    v->height = options->height;
+
+    for (int j = 0; j < 4; ++j)
+      v->color[j] = 1.0f;
+
+    v->resolution[0] = (float)options->screen_width;
+    v->resolution[1] = (float)options->screen_height;
+
+    v->tex_coord[0] = vertices[i * 4 + 2];
+    v->tex_coord[1] = vertices[i * 4 + 3];
+  }
+
+  renderer->shape_count++;
+}
+
+void renderer_upload_texture_atlas(struct renderer *renderer,
+                                   const unsigned char *data, int width,
+                                   int height) {
+  glGenTextures(1, &renderer->atlas_id);
+  glBindTexture(GL_TEXTURE_2D, renderer->atlas_id);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA,
+               GL_UNSIGNED_BYTE, data);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+  glBindTexture(GL_TEXTURE_2D, 0);
 }
