@@ -452,8 +452,8 @@ void renderer_add_rounded_rect(struct renderer *renderer, float x, float y,
     v->fs_quad_pos[0] = vertices[i * 2];
     v->fs_quad_pos[1] = vertices[i * 2 + 1];
 
-    v->shape_pos[0] = norm_x;
-    v->shape_pos[1] = norm_y;
+    v->shape_pos[0] = norm_x + half_width / screen_width * 2.0f;
+    v->shape_pos[1] = norm_y - half_height / screen_height * 2.0f;
 
     v->local_pos[0] = vertices[i * 2];
     v->local_pos[1] = vertices[i * 2 + 1];
@@ -539,8 +539,8 @@ void renderer_add_texture(struct renderer *renderer,
   normalize_coordinates(options->x, options->y, options->screen_width,
                         options->screen_height, &norm_x, &norm_y);
 
-  float half_width = options->rect_width * 0.5f * options->scale;
-  float half_height = options->rect_height * 0.5f * options->scale;
+  float width = options->rect_width * options->scale;
+  float height = options->rect_height * options->scale;
 
   float u0 = options->rect_x / options->width;
   float v0 = options->rect_y / options->height;
@@ -559,10 +559,9 @@ void renderer_add_texture(struct renderer *renderer,
     v1 = temp;
   }
 
-  float vertices[24] = {
-      -half_width, half_height,  u0, v1, -half_width, -half_height, u0, v0,
-      half_width,  -half_height, u1, v0, -half_width, half_height,  u0, v1,
-      half_width,  -half_height, u1, v0, half_width,  half_height,  u1, v1};
+  float vertices[24] = {0.0f,  0.0f,    u0, v1, 0.0f,  -height, u0, v0,
+                        width, -height, u1, v0, 0.0f,  0.0f,    u0, v1,
+                        width, -height, u1, v0, width, 0.0f,    u1, v1};
 
   float cos_theta = cosf(options->rotation);
   float sin_theta = sinf(options->rotation);

@@ -13,6 +13,7 @@ struct engine {
   int window_width;
   int window_height;
   update_callback_t update_callback;
+  render_callback_t render_callback;
   struct renderer *renderer;
   int fps;
 };
@@ -127,13 +128,13 @@ void engine_run(struct engine *e) {
     double deltaTime = currentTime - lastTime;
     lastTime = currentTime;
 
-    double startTime = glfwGetTime();
-
     if (e->update_callback) {
       e->update_callback(e, e->renderer, deltaTime);
     }
 
-    double updateTime = glfwGetTime();
+    if (e->render_callback) {
+      e->render_callback(e, e->renderer);
+    }
 
     frameCount++;
 
@@ -144,33 +145,17 @@ void engine_run(struct engine *e) {
     }
 
     process_input(e);
-    int windowWidth, windowHeight;
-    glfwGetFramebufferSize(e->window, &windowWidth, &windowHeight);
-    float aspect_ratio = (float)windowWidth / (float)windowHeight;
-
-    renderer_clear(e->renderer, 41.0f / 255.0f, 44.0f / 255.0f, 60.0f / 255.0f,
-                   1.0f);
-
-    double clearTime = glfwGetTime();
-
-    glUseProgram(renderer_get_shader(e->renderer));
-    check_gl_errors();
-
-    renderer_draw(e->renderer);
-    check_gl_errors();
-
-    double drawTime = glfwGetTime();
-
-    double swapStartTime = glfwGetTime();
     glfwSwapBuffers(e->window);
-    double swapEndTime = glfwGetTime();
-
     glfwPollEvents();
   }
 }
 
 void engine_set_update_callback(struct engine *e, update_callback_t callback) {
   e->update_callback = callback;
+}
+
+void engine_set_render_callback(struct engine *e, render_callback_t callback) {
+  e->render_callback = callback;
 }
 
 int engine_get_fps(struct engine *e) { return e->fps; }
