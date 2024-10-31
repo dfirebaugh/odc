@@ -9,13 +9,14 @@
 #include "renderer.h"
 
 struct engine {
-  GLFWwindow *window;
-  int window_width;
-  int window_height;
-  update_callback_t update_callback;
-  render_callback_t render_callback;
-  struct renderer *renderer;
-  int fps;
+    GLFWwindow *window;
+    int window_width;
+    int window_height;
+    update_callback_t update_callback;
+    render_callback_t render_callback;
+    void* audio_data;
+    struct renderer *renderer;
+    int fps;
 };
 
 void framebuffer_size_callback(GLFWwindow *window, int width, int height) {
@@ -155,7 +156,15 @@ void engine_set_update_callback(struct engine *e, update_callback_t callback) {
 }
 
 void engine_set_render_callback(struct engine *e, render_callback_t callback) {
-  e->render_callback = callback;
+    e->render_callback = callback;
+}
+
+void engine_set_audio_data(struct engine *e, void* audio_data) {
+    e->audio_data = audio_data;
+}
+
+void * engine_get_audio_data(struct engine *e) {
+  return e->audio_data;
 }
 
 int engine_get_fps(struct engine *e) { return e->fps; }

@@ -1,4 +1,3 @@
-
 #include "glad.h"
 #include "input.h"
 #include <GLFW/glfw3.h>
@@ -163,26 +162,28 @@ void flip_image_vertically(unsigned char *data, int width, int height,
 }
 
 int main() {
-  struct engine *e = engine_new(240 * 3, 160 * 3);
-  if (!e) {
-    return -1;
-  }
-  char *file_path = "./assets/images/buddy_dance.png";
-  int width, height, channels;
-  unsigned char *data = stbi_load(file_path, &width, &height, &channels, 4);
-  if (!data) {
-    fprintf(stderr, "Failed to load texture: %s\n", file_path);
-    return 1;
-  }
-  flip_image_vertically(data, width, height, channels);
-  renderer_upload_texture_atlas(engine_get_renderer(e), data, width, height);
+        struct engine *e = engine_new(240 * 3, 160 * 3);
+        if (!e) {
+                return -1;
+        }
 
-  engine_set_update_callback(e, example_update);
-  engine_set_render_callback(e, example_render);
-  engine_run(e);
-  engine_destroy(e);
+        char *file_path = "./assets/images/buddy_dance.png";
+        int width, height, channels;
+        unsigned char *data = stbi_load(file_path, &width, &height, &channels, 4);
+        if (!data) {
+                fprintf(stderr, "Failed to load texture: %s\n", file_path);
+                return 1;
+        }
 
-  stbi_image_free(data);
+        flip_image_vertically(data, width, height, channels);
+        renderer_upload_texture_atlas(engine_get_renderer(e), data, width, height);
 
-  return 0;
+        engine_set_update_callback(e, example_update);
+        engine_set_render_callback(e, example_render);
+        engine_run(e);
+        engine_destroy(e);
+
+        stbi_image_free(data);
+
+        return 0;
 }

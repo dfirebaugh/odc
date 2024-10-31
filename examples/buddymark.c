@@ -30,22 +30,22 @@ struct Buddy {
 };
 
 static struct Buddy bunnies[MAX_BUDDIES];
-static int bunny_count = 0;
+static int buddy_count = 0;
 
 void add_buddy(int windowWidth, int windowHeight) {
-  if (bunny_count >= MAX_BUDDIES)
+  if (buddy_count >= MAX_BUDDIES)
     return;
 
-  struct Buddy *bunny = &bunnies[bunny_count++];
-  bunny->x = rand() % windowWidth;
-  bunny->y = rand() % windowHeight;
-  bunny->vx = (float)(rand() % 200 - 100) / 60.0f;
-  bunny->vy = (float)(rand() % 200 - 100) / 60.0f;
-  bunny->frame_index = 0;
-  bunny->frame_time = 0.0;
+  struct Buddy *buddy = &bunnies[buddy_count++];
+  buddy->x = rand() % windowWidth;
+  buddy->y = rand() % windowHeight;
+  buddy->vx = (float)(rand() % 200 - 100) / 60.0f;
+  buddy->vy = (float)(rand() % 200 - 100) / 60.0f;
+  buddy->frame_index = 0;
+  buddy->frame_time = 0.0;
 
-  bunny->options = (struct TextureRenderOptions){.x = bunny->x,
-                                                 .y = bunny->y,
+  buddy->options = (struct TextureRenderOptions){.x = buddy->x,
+                                                 .y = buddy->y,
                                                  .width = 128,
                                                  .height = 32,
                                                  .rect_x = 0,
@@ -73,39 +73,39 @@ void buddymark_example_update(struct engine *e, struct renderer *renderer,
     }
   }
   if (is_mouse_button_just_pressed(window, GLFW_MOUSE_BUTTON_RIGHT)) {
-    bunny_count = 0;
+    buddy_count = 0;
     renderer_clear_vertices(renderer);
     return;
   }
 
-  for (int i = 0; i < bunny_count; ++i) {
-    struct Buddy *bunny = &bunnies[i];
-    bunny->vy += GRAVITY;
+  for (int i = 0; i < buddy_count; ++i) {
+    struct Buddy *buddy = &bunnies[i];
+    buddy->vy += GRAVITY;
 
-    bunny->x += bunny->vx * delta_time * 60.0f;
-    bunny->y += bunny->vy * delta_time * 60.0f;
+    buddy->x += buddy->vx * delta_time * 60.0f;
+    buddy->y += buddy->vy * delta_time * 60.0f;
 
-    if (bunny->x < 0) {
-      bunny->x = 0;
-      bunny->vx *= -DAMPING;
-    } else if (bunny->x > windowWidth - 32) {
-      bunny->x = windowWidth - 32;
-      bunny->vx *= -DAMPING;
+    if (buddy->x < 0) {
+      buddy->x = 0;
+      buddy->vx *= -DAMPING;
+    } else if (buddy->x > windowWidth - 32) {
+      buddy->x = windowWidth - 32;
+      buddy->vx *= -DAMPING;
     }
 
-    if (bunny->y > windowHeight - 32) {
-      bunny->y = windowHeight - 32;
-      bunny->vy *= -DAMPING;
+    if (buddy->y > windowHeight - 32) {
+      buddy->y = windowHeight - 32;
+      buddy->vy *= -DAMPING;
     }
 
-    bunny->options.x = bunny->x;
-    bunny->options.y = bunny->y;
+    buddy->options.x = buddy->x;
+    buddy->options.y = buddy->y;
 
-    bunny->frame_time += delta_time;
-    if (bunny->frame_time >= 0.1) {
-      bunny->frame_time = 0.0;
-      bunny->frame_index = (bunny->frame_index + 1) % 4;
-      bunny->options.rect_x = bunny->frame_index * 32;
+    buddy->frame_time += delta_time;
+    if (buddy->frame_time >= 0.1) {
+      buddy->frame_time = 0.0;
+      buddy->frame_index = (buddy->frame_index + 1) % 4;
+      buddy->options.rect_x = buddy->frame_index * 32;
     }
   }
 
@@ -123,9 +123,9 @@ void buddymark_example_render(struct engine *e, struct renderer *renderer) {
   int windowWidth, windowHeight;
   glfwGetFramebufferSize(window, &windowWidth, &windowHeight);
 
-  for (int i = 0; i < bunny_count; ++i) {
-    struct Buddy *bunny = &bunnies[i];
-    renderer_add_texture(renderer, &bunny->options);
+  for (int i = 0; i < buddy_count; ++i) {
+    struct Buddy *buddy = &bunnies[i];
+    renderer_add_texture(renderer, &buddy->options);
   }
 
   float rounded_rect_width = 240.0f;
@@ -145,7 +145,7 @@ void buddymark_example_render(struct engine *e, struct renderer *renderer) {
   if (text_update_timer >= 0.2) {
     text_update_timer = 0.0;
     sprintf(fps_text, "fps: %d", engine_get_fps(e));
-    sprintf(buddies_text, "buddies: %d", bunny_count);
+    sprintf(buddies_text, "buddies: %d", buddy_count);
     float avg_frame_time = debug_calculate_average_frame_time();
     sprintf(avg_frame_time_text, "Avg Frame Time: %.1f ms", avg_frame_time);
   }
