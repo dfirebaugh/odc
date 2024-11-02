@@ -1,10 +1,13 @@
 # odc
 
 I don't know what this is yet.
-I guess for now, it's a demonstration of drawing multiple 2D shapes in one draw call.
+For now, it's a library that acts as a simple 2D game engine with a multichannel oscillator synth.
 
+## Examples
 
-## build
+examples can be found here [odc-examples](https://github.com/dfirebaugh/odc-examples)
+
+## dependencies 
 
 This project uses opengl and glfw
 
@@ -15,13 +18,3 @@ apt-get install portaudio19-dev
 apt-get install libfreetype6-dev
 ```
 
-```bash
-make
-./build/example
-```
-
-### Reference
-
-- [One Draw Call UI](https://ruby0x1.github.io/machinery_blog_archive/post/one-draw-call-ui/index.html)
-- [Primitive Buffers](https://ruby0x1.github.io/machinery_blog_archive/post/ui-rendering-using-primitive-buffers/)
-- [OpenGL Buffer Texture](https://www.khronos.org/opengl/wiki/Buffer_Texture)
