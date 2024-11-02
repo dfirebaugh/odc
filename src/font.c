@@ -1,65 +1,128 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "font.h"
-#define STB_TRUETYPE_IMPLEMENTATION
-#include "stb_truetype.h"
+#include "odc_font.h"
 
-int font_load(const char *font_path, Font *font) {
-  FILE *file = fopen(font_path, "rb");
-  if (!file) {
-    fprintf(stderr, "Failed to open font file: %s\n", font_path);
+#define ATLAS_WIDTH 512
+#define ATLAS_HEIGHT 512
+
+int odc_font_load(const char *font_path, struct font *font) {
+  if (!font) {
+    fprintf(stderr, "ERROR::FONT: Font pointer is NULL\n");
     return -1;
   }
 
-  fseek(file, 0, SEEK_END);
-  size_t size = ftell(file);
-  fseek(file, 0, SEEK_SET);
-
-  unsigned char *font_buffer = (unsigned char *)malloc(size);
-  if (!font_buffer) {
-    fprintf(stderr, "Failed to allocate memory for font buffer\n");
-    fclose(file);
+  if (FT_Init_FreeType(&font->ft)) {
+    fprintf(stderr, "ERROR::FREETYPE: Could not init FreeType Library\n");
     return -1;
   }
 
-  fread(font_buffer, 1, size, file);
-  fclose(file);
-
-  font->cdata = (stbtt_bakedchar *)malloc(96 * sizeof(stbtt_bakedchar));
-  if (!font->cdata) {
-    fprintf(stderr, "Failed to allocate memory for character data\n");
-    free(font_buffer);
+  if (FT_New_Face(font->ft, font_path, 0, &font->face)) {
+    fprintf(stderr, "ERROR::FREETYPE: Failed to load font %s\n", font_path);
+    FT_Done_FreeType(font->ft);
     return -1;
   }
 
-  unsigned char *bitmap = (unsigned char *)malloc(512 * 512);
-  if (!bitmap) {
-    fprintf(stderr, "Failed to allocate memory for bitmap\n");
-    free(font->cdata);
-    free(font_buffer);
+  FT_Set_Pixel_Sizes(font->face, 0, 48);
+
+  glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+
+  unsigned char *atlas_bitmap = (unsigned char *)calloc(
+      ATLAS_WIDTH * ATLAS_HEIGHT, sizeof(unsigned char));
+  if (!atlas_bitmap) {
+    fprintf(stderr,
+            "ERROR::FONT: Failed to allocate memory for atlas bitmap\n");
+    FT_Done_Face(font->face);
+    FT_Done_FreeType(font->ft);
     return -1;
   }
 
-  stbtt_BakeFontBitmap(font_buffer, 0, 48.0, bitmap, 512, 512, 32, 96,
-                       font->cdata);
-  free(font_buffer);
+  int x_offset = 0;
+  int y_offset = 0;
+  int row_height = 0;
 
-  glGenTextures(1, &font->texture_id);
-  glBindTexture(GL_TEXTURE_2D, font->texture_id);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, 512, 512, 0, GL_RED, GL_UNSIGNED_BYTE,
-               bitmap);
+  for (unsigned char c = 32; c < 32 + MAX_GLYPHS; c++) {
+    // Load character glyph
+    if (FT_Load_Char(font->face, c, FT_LOAD_RENDER)) {
+      fprintf(stderr,
+              "ERROR::FREETYPE: Failed to load Glyph for character '%c'\n", c);
+      continue;
+    }
+
+    FT_GlyphSlot g = font->face->glyph;
+
+    if (x_offset + g->bitmap.width > ATLAS_WIDTH) {
+      x_offset = 0;
+      y_offset += row_height;
+      row_height = 0;
+    }
+
+    if (y_offset + g->bitmap.rows > ATLAS_HEIGHT) {
+      fprintf(stderr,
+              "ERROR::FONT: Texture atlas is too small for all glyphs\n");
+      free(atlas_bitmap);
+      FT_Done_Face(font->face);
+      FT_Done_FreeType(font->ft);
+      return -1;
+    }
+
+    for (int row = 0; row < g->bitmap.rows; row++) {
+      for (int col = 0; col < g->bitmap.width; col++) {
+        int atlas_x = x_offset + col;
+        int atlas_y = y_offset + row;
+        if (atlas_x < ATLAS_WIDTH && atlas_y < ATLAS_HEIGHT) {
+          atlas_bitmap[atlas_y * ATLAS_WIDTH + atlas_x] =
+              g->bitmap.buffer[row * g->bitmap.width + col];
+        }
+      }
+    }
+
+    int glyph_index = c - 32;
+    struct glyph *glyph = &font->glyphs[glyph_index];
+    glyph->width = g->bitmap.width;
+    glyph->height = g->bitmap.rows;
+    glyph->bearing_x = g->bitmap_left;
+    glyph->bearing_y = g->bitmap_top;
+    glyph->advance = g->advance.x >> 6;
+
+    glyph->tex_offset_x = (float)x_offset / (float)ATLAS_WIDTH;
+    glyph->tex_offset_y = (float)y_offset / (float)ATLAS_HEIGHT;
+
+    x_offset += g->bitmap.width;
+    if (g->bitmap.rows > row_height) {
+      row_height = g->bitmap.rows;
+    }
+  }
+
+  glGenTextures(1, &font->atlas);
+  font->texture_id = font->atlas;
+  glBindTexture(GL_TEXTURE_2D, font->atlas);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, ATLAS_WIDTH, ATLAS_HEIGHT, 0, GL_RED,
+               GL_UNSIGNED_BYTE, atlas_bitmap);
+
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-  GLenum error = glGetError();
-  if (error != GL_NO_ERROR) {
-    fprintf(stderr, "OpenGL error after setting texture parameters: %d\n",
-            error);
-  }
+  free(atlas_bitmap);
 
-  free(bitmap);
+  glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
 
-  font->scale = 1.0f / 512.0f;
+  font->scale = 1.0f / (float)ATLAS_WIDTH;
+
+  FT_Done_Face(font->face);
+  FT_Done_FreeType(font->ft);
+
   return 0;
+}
+
+void odc_font_free(struct font *font) {
+  if (!font)
+    return;
+
+  if (font->atlas) {
+    glDeleteTextures(1, &font->atlas);
+    font->atlas = 0;
+  }
 }

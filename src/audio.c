@@ -7,43 +7,42 @@
 #include <time.h>
 #include <unistd.h>
 
-#include "audio.h"
-#include "oscillator.h"
+#include "odc_audio.h"
+#include "odc_oscillator.h"
 
 int is_playback_active = 0;
 
-CustomWaveform custom_waveforms[MAX_CUSTOM_WAVEFORMS];
-int num_custom_waveforms = 0;
+custom_waveform odc_custom_waveforms[MAX_CUSTOM_WAVEFORMS];
+int odc_num_custom_waveforms = 0;
 
 static float calculate_adsr_envelope(oscillator *osc);
 static float generate_waveform_sample(oscillator *osc, float envelope);
 static float generate_noise_sample(oscillator *osc, float envelope);
 static void update_sample_buffer(oscillator *osc, float sample);
 static int initialize_portaudio();
-static int start_portaudio_stream(PaStream **stream, oscillator *osc);
+static int start_portodc_audio_stream(PaStream **stream, oscillator *osc);
 static void stop_and_close_stream(PaStream *stream);
 static void handle_vibrato(oscillator *osc, float *current_freq);
 static void handle_sweep_up(oscillator *osc, float *current_freq);
 static void handle_sweep_down(oscillator *osc, float *current_freq);
 static void apply_max_volume(oscillator *osc, float *sample);
 
-int audio_callback(const void *inputBuffer, void *outputBuffer,
-                   unsigned long framesPerBuffer,
-                   const PaStreamCallbackTimeInfo *timeInfo,
-                   PaStreamCallbackFlags statusFlags, void *userData) {
-  AudioData *audio_data = (AudioData *)userData;
-  if (audio_data == NULL || audio_data->app_running == NULL) {
-    fprintf(stderr,
-            "Audio callback error: audio_data or app_running is NULL.\n");
+int odc_audio_callback(const void *inputBuffer, void *outputBuffer,
+                       unsigned long framesPerBuffer,
+                       const PaStreamCallbackTimeInfo *timeInfo,
+                       PaStreamCallbackFlags statusFlags, void *userData) {
+  odc_audio_data *ad = (odc_audio_data *)userData;
+  if (ad == NULL || ad->app_running == NULL) {
+    fprintf(stderr, "Audio callback error: ad or app_running is NULL.\n");
     return paAbort;
   }
 
-  if (!*(audio_data->app_running)) {
+  if (!*(ad->app_running)) {
     memset(outputBuffer, 0, framesPerBuffer * sizeof(float));
     return paComplete;
   }
 
-  oscillator **oscillators = audio_data->oscillators;
+  oscillator **oscillators = ad->oscillators;
   float *out = (float *)outputBuffer;
   (void)inputBuffer;
 
@@ -282,9 +281,9 @@ static int initialize_portaudio() {
   return 0;
 }
 
-static int start_portaudio_stream(PaStream **stream, oscillator *osc) {
+static int start_portodc_audio_stream(PaStream **stream, oscillator *osc) {
   PaError err = Pa_OpenDefaultStream(stream, 0, 1, paFloat32, SAMPLE_RATE, 256,
-                                     audio_callback, osc);
+                                     odc_audio_callback, osc);
   if (err != paNoError) {
     fprintf(stderr, "PortAudio error: %s\n", Pa_GetErrorText(err));
     return -1;
@@ -316,14 +315,12 @@ static void stop_and_close_stream(PaStream *stream) {
   }
 }
 
-int audio_init() {
-  return initialize_portaudio();
-}
+int odc_audio_init() { return initialize_portaudio(); }
 
-int audio_play_waveform(oscillator *osc) {
+int odc_audio_play_note(oscillator *osc) {
   PaStream *stream;
 
-  if (start_portaudio_stream(&stream, osc) != 0) {
+  if (start_portodc_audio_stream(&stream, osc) != 0) {
     return -1;
   }
 
@@ -335,16 +332,31 @@ int audio_play_waveform(oscillator *osc) {
   return 0;
 }
 
-int audio_is_playback_active() { return is_playback_active; }
+int odc_audio_play_waveform(oscillator *osc) {
+  PaStream *stream;
 
-void audio_set_playback_active(int is_active) {
+  if (start_portodc_audio_stream(&stream, osc) != 0) {
+    return -1;
+  }
+
+  float duration = (float)osc->table_size / osc->base_freq;
+  Pa_Sleep(duration * 1000);
+
+  stop_and_close_stream(stream);
+
+  return 0;
+}
+
+int odc_audio_is_playback_active() { return is_playback_active; }
+
+void odc_audio_set_playback_active(int is_active) {
   is_playback_active = is_active;
 }
 
-void *audio_play_sequence_thread(void *arg) {
-  OscillatorThreadData *data = (OscillatorThreadData *)arg;
+void *odc_audio_play_sequence_thread(void *arg) {
+  odc_oscillator_thread_data *data = (odc_oscillator_thread_data *)arg;
   oscillator **oscillators = data->oscillators;
-  Note **sequences = data->sequences;
+  oscillator_note **sequences = data->sequences;
   int *num_notes = data->num_notes;
   int num_channels = data->num_channels;
 
@@ -375,27 +387,27 @@ void *audio_play_sequence_thread(void *arg) {
       }
 
       oscillator *osc = oscillators[ch];
-      Note *notes = sequences[ch];
+      oscillator_note *notes = sequences[ch];
 
       if (!playing[ch]) {
-        Note current_note = notes[note_indices[ch]];
+        oscillator_note current_note = notes[note_indices[ch]];
 
         pthread_mutex_lock(&osc->mutex);
 
         int is_custom_waveform = 0;
-        for (int i = 0; i < num_custom_waveforms; i++) {
+        for (int i = 0; i < odc_num_custom_waveforms; i++) {
           if (strcasecmp(current_note.waveform_name,
-                         custom_waveforms[i].name) == 0) {
-            oscillator_set_custom_waveform(osc, &custom_waveforms[i]);
+                         odc_custom_waveforms[i].name) == 0) {
+            odc_oscillator_set_custom_waveform(osc, &odc_custom_waveforms[i]);
             is_custom_waveform = 1;
             break;
           }
         }
         if (!is_custom_waveform) {
-          oscillator_set_waveform(osc, current_note.waveform_name);
+          odc_oscillator_set_waveform(osc, current_note.waveform_name);
         }
 
-        oscillator_set_freq(osc, current_note.freq);
+        odc_oscillator_set_freq(osc, current_note.freq);
 
         osc->attack_time = current_note.attack;
         osc->decay_time = current_note.decay;
@@ -416,7 +428,7 @@ void *audio_play_sequence_thread(void *arg) {
         playing[ch] = 1;
       } else {
         double note_elapsed_time = elapsed_time - note_start_times[ch];
-        Note current_note = notes[note_indices[ch]];
+        oscillator_note current_note = notes[note_indices[ch]];
         if (note_elapsed_time >= current_note.duration) {
           pthread_mutex_lock(&osc->mutex);
           osc->playing = 0;
@@ -441,4 +453,4 @@ void *audio_play_sequence_thread(void *arg) {
   return NULL;
 }
 
-void audio_terminate() { Pa_Terminate(); }
+void odc_audio_terminate() { Pa_Terminate(); }

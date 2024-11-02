@@ -4,9 +4,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "shader.h"
+#include "odc_shader.h"
 
-GLuint compile_shader(const char *source, GLenum shaderType, char *error) {
+GLuint odc_shader_compile_shader(const char *source, GLenum shaderType,
+                                 char *error) {
   GLuint shader = glCreateShader(shaderType);
 
   glShaderSource(shader, 1, &source, NULL);
@@ -31,16 +32,16 @@ GLuint compile_shader(const char *source, GLenum shaderType, char *error) {
   return shader;
 }
 
-GLuint new_program(const char *vertexShaderSource,
-                   const char *fragmentShaderSource, char *error) {
+GLuint odc_shader_new_program(const char *vertexShaderSource,
+                              const char *fragmentShaderSource, char *error) {
   GLuint vertexShader =
-      compile_shader(vertexShaderSource, GL_VERTEX_SHADER, error);
+      odc_shader_compile_shader(vertexShaderSource, GL_VERTEX_SHADER, error);
   if (vertexShader == 0) {
     return 0;
   }
 
-  GLuint fragmentShader =
-      compile_shader(fragmentShaderSource, GL_FRAGMENT_SHADER, error);
+  GLuint fragmentShader = odc_shader_compile_shader(fragmentShaderSource,
+                                                    GL_FRAGMENT_SHADER, error);
   if (fragmentShader == 0) {
     return 0;
   }

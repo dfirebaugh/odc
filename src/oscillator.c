@@ -1,5 +1,4 @@
 #include <math.h>
-#include <portaudio.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -7,21 +6,22 @@
 #include <time.h>
 #include <unistd.h>
 
-#include "audio.h"
-#include "oscillator.h"
-unsigned short *oscillator_generate_sine_wave(int table_size);
-unsigned short *oscillator_generate_square_wave(int table_size);
-unsigned short *oscillator_generate_triangle_wave(int table_size);
+#include "odc_audio.h"
+#include "odc_oscillator.h"
 
-oscillator oscillator_init(int base_freq, int table_size,
-                           float initial_volume) {
+unsigned short *odc_oscillator_generate_sine_wave(int table_size);
+unsigned short *odc_oscillator_generate_square_wave(int table_size);
+unsigned short *odc_oscillator_generate_triangle_wave(int table_size);
+
+oscillator odc_oscillator_init(int base_freq, int table_size,
+                               float initial_volume) {
   oscillator osc;
   osc.base_freq = base_freq;
   osc.table_size = table_size;
   osc.sample_rate = SAMPLE_RATE;
   osc.current_waveform = NULL;
 
-  osc.current_waveform = oscillator_generate_sine_wave(table_size);
+  osc.current_waveform = odc_oscillator_generate_sine_wave(table_size);
   if (!osc.current_waveform) {
     fprintf(stderr, "Failed to allocate square waveform.\n");
   }
@@ -47,7 +47,7 @@ oscillator oscillator_init(int base_freq, int table_size,
   return osc;
 }
 
-void oscillator_set_volume(oscillator *osc, float volume) {
+void odc_oscillator_set_volume(oscillator *osc, float volume) {
   if (volume < 0.0f) {
     volume = 0.0f;
   } else if (volume > 1.0f) {
@@ -56,7 +56,7 @@ void oscillator_set_volume(oscillator *osc, float volume) {
   osc->volume = volume;
 }
 
-void oscillator_set_max_volume(oscillator *osc, float volume) {
+void odc_oscillator_set_max_volume(oscillator *osc, float volume) {
   if (volume < 0.0f) {
     volume = 0.0f;
   } else if (volume > 1.0f) {
@@ -67,7 +67,7 @@ void oscillator_set_max_volume(oscillator *osc, float volume) {
   pthread_mutex_unlock(&osc->mutex);
 }
 
-void oscillator_set_waveform(oscillator *osc, const char *waveform_type) {
+void odc_oscillator_set_waveform(oscillator *osc, const char *waveform_type) {
   if (osc->current_waveform != NULL) {
     free(osc->current_waveform);
     osc->current_waveform = NULL;
@@ -77,17 +77,19 @@ void oscillator_set_waveform(oscillator *osc, const char *waveform_type) {
           sizeof(osc->current_waveform_name) - 1);
   osc->current_waveform_name[sizeof(osc->current_waveform_name) - 1] = '\0';
 
-  printf("Setting waveform for oscillator %p to %s.\n", (void *)osc,
-         waveform_type);
+  /*printf("Setting waveform for oscillator %p to %s.\n", (void *)osc,*/
+  /*       waveform_type);*/
 
   if (strcasecmp(waveform_type, "sine") == 0) {
-    osc->current_waveform = oscillator_generate_sine_wave(osc->table_size);
+    osc->current_waveform = odc_oscillator_generate_sine_wave(osc->table_size);
     osc->is_noise = 0;
   } else if (strcasecmp(waveform_type, "square") == 0) {
-    osc->current_waveform = oscillator_generate_square_wave(osc->table_size);
+    osc->current_waveform =
+        odc_oscillator_generate_square_wave(osc->table_size);
     osc->is_noise = 0;
   } else if (strcasecmp(waveform_type, "triangle") == 0) {
-    osc->current_waveform = oscillator_generate_triangle_wave(osc->table_size);
+    osc->current_waveform =
+        odc_oscillator_generate_triangle_wave(osc->table_size);
     osc->is_noise = 0;
   } else if (strcasecmp(waveform_type, "rest") == 0) {
     osc->current_waveform = malloc(osc->table_size * sizeof(unsigned short));
@@ -95,11 +97,12 @@ void oscillator_set_waveform(oscillator *osc, const char *waveform_type) {
       memset(osc->current_waveform, 0,
              osc->table_size * sizeof(unsigned short));
       osc->is_noise = 0;
-      printf("Oscillator %p set to REST waveform.\n", (void *)osc);
+      /*printf("Oscillator %p set to REST waveform.\n", (void *)osc);*/
     } else {
       fprintf(stderr, "Failed to allocate memory for REST waveform.\n");
       osc->is_noise = 0;
-      osc->current_waveform = oscillator_generate_sine_wave(osc->table_size);
+      osc->current_waveform =
+          odc_oscillator_generate_sine_wave(osc->table_size);
       if (osc->current_waveform) {
         printf("Oscillator %p fallback to SINE waveform.\n", (void *)osc);
       } else {
@@ -108,14 +111,15 @@ void oscillator_set_waveform(oscillator *osc, const char *waveform_type) {
     }
   } else {
     printf("Unknown waveform type: %s. Defaulting to SINE.\n", waveform_type);
-    osc->current_waveform = oscillator_generate_sine_wave(osc->table_size);
+    osc->current_waveform = odc_oscillator_generate_sine_wave(osc->table_size);
     osc->is_noise = 0;
   }
 
   osc->waveform_scale = 1.0f;
 }
 
-void oscillator_set_custom_waveform(oscillator *osc, CustomWaveform *waveform) {
+void odc_oscillator_set_custom_waveform(oscillator *osc,
+                                        custom_waveform *waveform) {
   if (osc->current_waveform != NULL) {
     free(osc->current_waveform);
     osc->current_waveform = NULL;
@@ -131,7 +135,7 @@ void oscillator_set_custom_waveform(oscillator *osc, CustomWaveform *waveform) {
   osc->is_noise = 0;
 }
 
-unsigned short *oscillator_generate_sine_wave(int table_size) {
+unsigned short *odc_oscillator_generate_sine_wave(int table_size) {
   unsigned short *waveform = malloc(table_size * sizeof(unsigned short));
   if (!waveform)
     return NULL;
@@ -144,7 +148,7 @@ unsigned short *oscillator_generate_sine_wave(int table_size) {
   return waveform;
 }
 
-unsigned short *oscillator_generate_square_wave(int table_size) {
+unsigned short *odc_oscillator_generate_square_wave(int table_size) {
   unsigned short *waveform = malloc(table_size * sizeof(unsigned short));
   if (!waveform)
     return NULL;
@@ -158,7 +162,7 @@ unsigned short *oscillator_generate_square_wave(int table_size) {
   return waveform;
 }
 
-unsigned short *oscillator_generate_triangle_wave(int table_size) {
+unsigned short *odc_oscillator_generate_triangle_wave(int table_size) {
   unsigned short *waveform = malloc(table_size * sizeof(unsigned short));
   if (!waveform)
     return NULL;
@@ -178,7 +182,7 @@ unsigned short *oscillator_generate_triangle_wave(int table_size) {
   return waveform;
 }
 
-unsigned short *oscillator_generate_sawtooth_wave(int table_size) {
+unsigned short *odc_oscillator_generate_sawtooth_wave(int table_size) {
   unsigned short *wave =
       (unsigned short *)malloc(table_size * sizeof(unsigned short));
   for (int i = 0; i < table_size; i++) {
@@ -187,18 +191,20 @@ unsigned short *oscillator_generate_sawtooth_wave(int table_size) {
   return wave;
 }
 
-void oscillator_set_noise_mode(oscillator *osc, int mode) {
+void odc_oscillator_set_noise_mode(oscillator *osc, int mode) {
   osc->noise_mode = mode;
 }
 
-void oscillator_set_freq(oscillator *osc, int freq) { osc->base_freq = freq; }
+void odc_oscillator_set_freq(oscillator *osc, int freq) {
+  osc->base_freq = freq;
+}
 
-void oscillator_stop(oscillator *osc) { printf("DCO stopped\n"); }
+void odc_oscillator_stop(oscillator *osc) { printf("DCO stopped\n"); }
 
-void oscillator_play_note(oscillator *osc, int freq, float duration,
-                          const char *waveform) {
+void odc_oscillator_play_note(oscillator *osc, int freq, float duration,
+                              const char *waveform) {
   if (osc == NULL) {
-    printf("DCO is NULL. Cannot play note.\n");
+    printf("Oscillator is NULL. Cannot play note.\n");
     return;
   }
   if (freq <= 20 || freq > 20000) {
@@ -207,53 +213,24 @@ void oscillator_play_note(oscillator *osc, int freq, float duration,
   }
 
   pthread_mutex_lock(&osc->mutex);
-
   if (waveform == NULL) {
     printf("Waveform is NULL. Defaulting to sine.\n");
     waveform = "sine";
   }
-
-  oscillator_set_waveform(osc, waveform);
-  oscillator_set_freq(osc, freq);
+  odc_oscillator_set_waveform(osc, waveform);
+  odc_oscillator_set_freq(osc, freq);
   osc->t = 0;
   pthread_mutex_unlock(&osc->mutex);
 
-  PaStream *stream;
-  PaError err;
-
-  err = Pa_OpenDefaultStream(&stream, 0, 1, paFloat32, SAMPLE_RATE, 256,
-                             audio_callback, osc);
-  if (err != paNoError) {
-    fprintf(stderr, "PortAudio error: %s\n", Pa_GetErrorText(err));
-    return;
-  }
-
-  err = Pa_StartStream(stream);
-  if (err != paNoError) {
-    fprintf(stderr, "PortAudio error: %s\n", Pa_GetErrorText(err));
-    return;
-  }
-
-  Pa_Sleep((int)(duration * 1000));
-
-  err = Pa_StopStream(stream);
-  if (err != paNoError) {
-    fprintf(stderr, "PortAudio error: %s\n", Pa_GetErrorText(err));
-    return;
-  }
-
-  err = Pa_CloseStream(stream);
-  if (err != paNoError) {
-    fprintf(stderr, "PortAudio error: %s\n", Pa_GetErrorText(err));
-    return;
-  }
+  odc_audio_play_note(osc);
 }
 
-void oscillator_play_note_struct(oscillator *osc, const Note *note) {
+void odc_oscillator_play_note_struct(oscillator *osc,
+                                     const oscillator_note *note) {
   pthread_mutex_lock(&osc->mutex);
 
   if (note->freq <= 0.0f) {
-    oscillator_set_waveform(osc, "rest");
+    odc_oscillator_set_waveform(osc, "rest");
     osc->note_duration = note->duration;
     osc->note_time = 0.0f;
     osc->playing = 1;
@@ -264,8 +241,8 @@ void oscillator_play_note_struct(oscillator *osc, const Note *note) {
     return;
   }
 
-  oscillator_set_waveform(osc, note->waveform_name);
-  oscillator_set_freq(osc, note->freq);
+  odc_oscillator_set_waveform(osc, note->waveform_name);
+  odc_oscillator_set_freq(osc, note->freq);
 
   osc->attack_time = note->attack;
   osc->decay_time = note->decay;
@@ -302,15 +279,15 @@ void oscillator_play_note_struct(oscillator *osc, const Note *note) {
 
 typedef struct {
   oscillator *osc;
-  Note *notes;
+  oscillator_note *notes;
   int num_notes;
   volatile int *app_running;
 } OscillatorSequenceData;
 
-void *oscillator_play_sequence_thread(void *arg) {
+void *odc_oscillator_play_sequence_thread(void *arg) {
   OscillatorSequenceData *data = (OscillatorSequenceData *)arg;
   oscillator *osc = data->osc;
-  Note *notes = data->notes;
+  oscillator_note *notes = data->notes;
   int num_notes = data->num_notes;
   volatile int *app_running = data->app_running;
 
@@ -327,24 +304,24 @@ void *oscillator_play_sequence_thread(void *arg) {
                           (ts_now.tv_nsec - ts_start.tv_nsec) / 1e9;
 
     if (!playing) {
-      Note current_note = notes[note_index];
+      oscillator_note current_note = notes[note_index];
 
       pthread_mutex_lock(&osc->mutex);
 
       int is_custom_waveform = 0;
-      for (int i = 0; i < num_custom_waveforms; i++) {
-        if (strcasecmp(current_note.waveform_name, custom_waveforms[i].name) ==
-            0) {
-          oscillator_set_custom_waveform(osc, &custom_waveforms[i]);
+      for (int i = 0; i < odc_num_custom_waveforms; i++) {
+        if (strcasecmp(current_note.waveform_name,
+                       odc_custom_waveforms[i].name) == 0) {
+          odc_oscillator_set_custom_waveform(osc, &odc_custom_waveforms[i]);
           is_custom_waveform = 1;
           break;
         }
       }
       if (!is_custom_waveform) {
-        oscillator_set_waveform(osc, current_note.waveform_name);
+        odc_oscillator_set_waveform(osc, current_note.waveform_name);
       }
 
-      oscillator_set_freq(osc, current_note.freq);
+      odc_oscillator_set_freq(osc, current_note.freq);
 
       osc->attack_time = current_note.attack;
       osc->decay_time = current_note.decay;
@@ -363,7 +340,7 @@ void *oscillator_play_sequence_thread(void *arg) {
       playing = 1;
     } else {
       double note_elapsed_time = elapsed_time - note_start_time;
-      Note current_note = notes[note_index];
+      oscillator_note current_note = notes[note_index];
       if (note_elapsed_time >= current_note.duration) {
         pthread_mutex_lock(&osc->mutex);
         osc->playing = 0;
@@ -385,8 +362,8 @@ void *oscillator_play_sequence_thread(void *arg) {
   return NULL;
 }
 
-void oscillator_play_sequence(oscillator *osc, Note notes[], int num_notes,
-                              volatile int *app_running) {
+void odc_oscillator_play_sequence(oscillator *osc, oscillator_note notes[],
+                                  int num_notes, volatile int *app_running) {
   OscillatorSequenceData *data = malloc(sizeof(OscillatorSequenceData));
   data->osc = osc;
   data->notes = notes;
@@ -394,6 +371,7 @@ void oscillator_play_sequence(oscillator *osc, Note notes[], int num_notes,
   data->app_running = app_running;
 
   pthread_t sequence_thread;
-  pthread_create(&sequence_thread, NULL, oscillator_play_sequence_thread, data);
+  pthread_create(&sequence_thread, NULL, odc_oscillator_play_sequence_thread,
+                 data);
   pthread_detach(sequence_thread);
 }

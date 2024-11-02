@@ -4,11 +4,14 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
-#include "font.h"
-#include "renderer.h"
-#include "shader.h"
-#include "string.h"
+#include "odc_font.h"
+#include "odc_renderer.h"
+#include "odc_shader.h"
+
+#define ATLAS_WIDTH 512
+#define ATLAS_HEIGHT 512
 
 struct vertex {
   float fs_quad_pos[2];
@@ -28,7 +31,7 @@ struct renderer {
   unsigned int VAO, VBO;
   int shape_count;
   GLuint shader_program;
-  Font font;
+  struct font font;
   GLuint atlas_id;
 };
 
@@ -157,11 +160,11 @@ const char *fragmentShaderSource =
     "    }\n"
     "}\n";
 
-struct renderer *renderer_new() {
+struct renderer *odc_renderer_new() {
   return (struct renderer *)malloc(sizeof(struct renderer));
 }
 
-void renderer_init(struct renderer *renderer, const char *font_path) {
+void odc_renderer_init(struct renderer *renderer, const char *font_path) {
   if (!renderer) {
     fprintf(stderr, "Renderer pointer is null\n");
     return;
@@ -169,7 +172,7 @@ void renderer_init(struct renderer *renderer, const char *font_path) {
 
   char error[256] = {0};
   GLuint shader_program =
-      new_program(vertexShaderSource, fragmentShaderSource, error);
+      odc_shader_new_program(vertexShaderSource, fragmentShaderSource, error);
   if (!shader_program) {
     fprintf(stderr, "Shader compilation or linking error: %s\n", error);
     return;
@@ -240,21 +243,21 @@ void renderer_init(struct renderer *renderer, const char *font_path) {
   glBindBuffer(GL_ARRAY_BUFFER, 0);
   glBindVertexArray(0);
 
-  if (font_load(font_path, &renderer->font) != 0) {
+  if (odc_font_load(font_path, &renderer->font) != 0) {
     fprintf(stderr, "Failed to load font\n");
     return;
   }
 }
 
-GLuint renderer_get_shader(struct renderer *renderer) {
+GLuint odc_renderer_get_shader(struct renderer *renderer) {
   return renderer->shader_program;
 }
 
-void renderer_reset_shape_count(struct renderer *renderer) {
+void odc_renderer_reset_shape_count(struct renderer *renderer) {
   renderer->shape_count = 0;
 }
 
-void renderer_draw(struct renderer *renderer) {
+void odc_renderer_draw(struct renderer *renderer) {
   check_gl_errors();
 
   glUseProgram(renderer->shader_program);
@@ -289,12 +292,12 @@ void renderer_draw(struct renderer *renderer) {
   glBindVertexArray(0);
 }
 
-void renderer_clear_vertices(struct renderer *renderer) {
+void odc_renderer_clear_vertices(struct renderer *renderer) {
   memset(renderer->vertices, 0, sizeof(renderer->vertices));
 }
 
-void renderer_clear(struct renderer *renderer, float r, float g, float b,
-                    float a) {
+void odc_renderer_clear(struct renderer *renderer, float r, float g, float b,
+                        float a) {
   glClearColor(r, g, b, a);
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 }
@@ -305,9 +308,10 @@ void normalize_coordinates(float x, float y, int screen_width,
   *norm_y = 1.0f - (y / (float)screen_height) * 2.0f;
 }
 
-void renderer_add_equilateral_triangle(struct renderer *renderer, float x,
-                                       float y, float size, int screen_width,
-                                       int screen_height, float *color) {
+void odc_renderer_add_equilateral_triangle(struct renderer *renderer, float x,
+                                           float y, float size,
+                                           int screen_width, int screen_height,
+                                           float *color) {
   if (renderer->shape_count >= MAX_SHAPES)
     return;
 
@@ -348,9 +352,10 @@ void renderer_add_equilateral_triangle(struct renderer *renderer, float x,
   renderer->shape_count++;
 }
 
-void renderer_add_triangle(struct renderer *renderer, float x1, float y1,
-                           float x2, float y2, float x3, float y3,
-                           int screen_width, int screen_height, float *color) {
+void odc_renderer_add_triangle(struct renderer *renderer, float x1, float y1,
+                               float x2, float y2, float x3, float y3,
+                               int screen_width, int screen_height,
+                               float *color) {
   if (renderer->shape_count >= MAX_SHAPES)
     return;
 
@@ -391,9 +396,9 @@ void renderer_add_triangle(struct renderer *renderer, float x1, float y1,
   renderer->shape_count++;
 }
 
-void renderer_add_circle(struct renderer *renderer, float x, float y,
-                         float radius, int screen_width, int screen_height,
-                         float *color) {
+void odc_renderer_add_circle(struct renderer *renderer, float x, float y,
+                             float radius, int screen_width, int screen_height,
+                             float *color) {
   if (renderer->shape_count >= MAX_SHAPES)
     return;
 
@@ -429,10 +434,10 @@ void renderer_add_circle(struct renderer *renderer, float x, float y,
   renderer->shape_count++;
 }
 
-void renderer_add_rounded_rect(struct renderer *renderer, float x, float y,
-                               float width, float height, float radius,
-                               int screen_width, int screen_height,
-                               float *color) {
+void odc_renderer_add_rounded_rect(struct renderer *renderer, float x, float y,
+                                   float width, float height, float radius,
+                                   int screen_width, int screen_height,
+                                   float *color) {
   if (renderer->shape_count >= MAX_SHAPES)
     return;
 
@@ -472,37 +477,49 @@ void renderer_add_rounded_rect(struct renderer *renderer, float x, float y,
   renderer->shape_count++;
 }
 
-void renderer_add_text(struct renderer *renderer, const char *text, float x,
-                       float y, float scale, int screen_width,
-                       int screen_height, float *color) {
-  if (renderer->shape_count >= MAX_SHAPES)
+void odc_renderer_add_text(struct renderer *renderer, const char *text, float x,
+                           float y, float scale, int screen_width,
+                           int screen_height, float *color) {
+  if (!renderer || !text || renderer->shape_count >= MAX_SHAPES)
     return;
 
+  float baseline = y + (renderer->font.ascender * scale);
+
   for (const char *c = text; *c; c++) {
-    stbtt_bakedchar *b = &renderer->font.cdata[*c - 32];
+    if (*c < 32 || *c >= 32 + MAX_GLYPHS) {
+      // Skip unsupported characters
+      continue;
+    }
 
-    float xpos = x + b->xoff * scale;
-    float ypos = y + b->yoff * scale;
+    struct glyph *g = &renderer->font.glyphs[*c - 32];
 
-    float w = (b->x1 - b->x0) * scale;
-    float h = (b->y1 - b->y0) * scale;
+    float xpos = x + (g->bearing_x * scale);
+    float ypos = baseline - (g->bearing_y * scale);
 
-    float tex_x0 = b->x0 / 512.0f;
-    float tex_y0 = b->y1 / 512.0f;
-    float tex_x1 = b->x1 / 512.0f;
-    float tex_y1 = b->y0 / 512.0f;
+    float w = (float)g->width * scale;
+    float h = (float)g->height * scale;
+
+    float tex_x0 = g->tex_offset_x;
+    float tex_y0 = g->tex_offset_y + ((float)g->height / ATLAS_HEIGHT);
+    float tex_x1 = g->tex_offset_x + ((float)g->width / ATLAS_WIDTH);
+    float tex_y1 = g->tex_offset_y;
 
     float vertices[24] = {
-        xpos,     ypos,     tex_x0, tex_y1, xpos,     ypos + h, tex_x0, tex_y0,
-        xpos + w, ypos + h, tex_x1, tex_y0, xpos,     ypos,     tex_x0, tex_y1,
-        xpos + w, ypos + h, tex_x1, tex_y0, xpos + w, ypos,     tex_x1, tex_y1};
+        xpos,   ypos,   tex_x0,   tex_y1,   xpos,     ypos + h,
+        tex_x0, tex_y0, xpos + w, ypos + h, tex_x1,   tex_y0,
+
+        xpos,   ypos,   tex_x0,   tex_y1,   xpos + w, ypos + h,
+        tex_x1, tex_y0, xpos + w, ypos,     tex_x1,   tex_y1};
 
     for (int i = 0; i < 6; ++i) {
       struct vertex *v = &renderer->vertices[renderer->shape_count * 6 + i];
 
+      float norm_quad_x, norm_quad_y;
       normalize_coordinates(vertices[i * 4], vertices[i * 4 + 1], screen_width,
-                            screen_height, &v->fs_quad_pos[0],
-                            &v->fs_quad_pos[1]);
+                            screen_height, &norm_quad_x, &norm_quad_y);
+
+      v->fs_quad_pos[0] = norm_quad_x;
+      v->fs_quad_pos[1] = norm_quad_y;
 
       v->shape_pos[0] = 0.0f;
       v->shape_pos[1] = 0.0f;
@@ -515,7 +532,7 @@ void renderer_add_text(struct renderer *renderer, const char *text, float x,
       v->width = w;
       v->height = h;
 
-      for (int j = 0; j < 4; ++j)
+      for (int j = 0; j < 4; j++)
         v->color[j] = color[j];
 
       v->resolution[0] = (float)screen_width;
@@ -526,12 +543,36 @@ void renderer_add_text(struct renderer *renderer, const char *text, float x,
     }
 
     renderer->shape_count++;
-    x += (b->xadvance) * scale;
+    x += (float)g->advance * scale;
   }
 }
 
-void renderer_add_texture(struct renderer *renderer,
-                          struct TextureRenderOptions *options) {
+void odc_renderer_add_multiline_text(struct renderer *renderer,
+                                     const char *text, float x, float y,
+                                     float scale, int screen_width,
+                                     int screen_height, float *color) {
+  if (!renderer || !text || renderer->shape_count >= MAX_SHAPES)
+    return;
+
+  float baseline = y + (renderer->font.ascender * scale);
+  float line_spacing = (renderer->font.ascender - renderer->font.descender +
+                        renderer->font.line_gap) *
+                       scale;
+
+  char *line = strdup(text);
+  char *token = strtok(line, "\n");
+  while (token != NULL) {
+    odc_renderer_add_text(renderer, token, x, baseline, scale, screen_width,
+                          screen_height, color);
+    baseline -= line_spacing;
+    token = strtok(NULL, "\n");
+  }
+
+  free(line);
+}
+
+void odc_renderer_add_texture(struct renderer *renderer,
+                              struct texture_render_options *options) {
   if (renderer->shape_count >= MAX_SHAPES)
     return;
 
@@ -602,9 +643,9 @@ void renderer_add_texture(struct renderer *renderer,
   renderer->shape_count++;
 }
 
-void renderer_upload_texture_atlas(struct renderer *renderer,
-                                   const unsigned char *data, int width,
-                                   int height) {
+void odc_renderer_upload_texture_atlas(struct renderer *renderer,
+                                       const unsigned char *data, int width,
+                                       int height) {
   glGenTextures(1, &renderer->atlas_id);
   glBindTexture(GL_TEXTURE_2D, renderer->atlas_id);
   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA,

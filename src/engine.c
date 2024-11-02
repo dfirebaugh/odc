@@ -4,19 +4,19 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "engine.h"
-#include "input.h"
-#include "renderer.h"
+#include "odc_engine.h"
+#include "odc_input.h"
+#include "odc_renderer.h"
 
 struct engine {
-    GLFWwindow *window;
-    int window_width;
-    int window_height;
-    update_callback_t update_callback;
-    render_callback_t render_callback;
-    void* audio_data;
-    struct renderer *renderer;
-    int fps;
+  GLFWwindow *window;
+  int window_width;
+  int window_height;
+  update_callback_t update_callback;
+  render_callback_t render_callback;
+  void *audio_data;
+  struct renderer *renderer;
+  int fps;
 };
 
 void framebuffer_size_callback(GLFWwindow *window, int width, int height) {
@@ -32,7 +32,7 @@ static void set_default_window_size(struct engine *e, int width, int height) {
   }
 }
 
-struct engine *engine_new(int width, int height) {
+struct engine *odc_engine_new(int width, int height) {
   struct engine *e = (struct engine *)calloc(1, sizeof(struct engine));
   if (!e) {
     fprintf(stderr, "Failed to allocate memory for engine\n");
@@ -74,7 +74,7 @@ struct engine *engine_new(int width, int height) {
   glViewport(0, 0, e->window_width, e->window_height);
   glfwSetFramebufferSizeCallback(e->window, framebuffer_size_callback);
 
-  e->renderer = renderer_new();
+  e->renderer = odc_renderer_new();
   if (!e->renderer) {
     fprintf(stderr, "Failed to allocate memory for renderer\n");
     glfwDestroyWindow(e->window);
@@ -82,7 +82,7 @@ struct engine *engine_new(int width, int height) {
     free(e);
     return NULL;
   }
-  renderer_init(
+  odc_renderer_init(
       e->renderer,
       "./assets/fonts/ComicShannsMono/ComicShannsMonoNerdFont-Bold.otf");
 
@@ -91,7 +91,7 @@ struct engine *engine_new(int width, int height) {
   return e;
 }
 
-void engine_destroy(struct engine *e) {
+void odc_engine_destroy(struct engine *e) {
   if (e) {
     if (e->window) {
       glfwDestroyWindow(e->window);
@@ -101,19 +101,21 @@ void engine_destroy(struct engine *e) {
   glfwTerminate();
 }
 
-struct GLFWwindow *engine_get_window(struct engine *e) { return e->window; }
+struct GLFWwindow *odc_engine_get_window(struct engine *e) { return e->window; }
 
-struct renderer *engine_get_renderer(struct engine *e) { return e->renderer; }
+struct renderer *odc_engine_get_renderer(struct engine *e) {
+  return e->renderer;
+}
 
-void process_input(struct engine *e) { input_update(e); }
+void process_input(struct engine *e) { odc_input_update(e); }
 
-void engine_run(struct engine *e) {
+void odc_engine_run(struct engine *e) {
   if (!e->renderer) {
     fprintf(stderr, "Renderer is not initialized\n");
     return;
   }
 
-  input_init(e->window);
+  odc_input_init(e->window);
 
   double lastTime = glfwGetTime();
   double lastTitleUpdateTime = lastTime;
@@ -151,20 +153,20 @@ void engine_run(struct engine *e) {
   }
 }
 
-void engine_set_update_callback(struct engine *e, update_callback_t callback) {
+void odc_engine_set_update_callback(struct engine *e,
+                                    update_callback_t callback) {
   e->update_callback = callback;
 }
 
-void engine_set_render_callback(struct engine *e, render_callback_t callback) {
-    e->render_callback = callback;
+void odc_engine_set_render_callback(struct engine *e,
+                                    render_callback_t callback) {
+  e->render_callback = callback;
 }
 
-void engine_set_audio_data(struct engine *e, void* audio_data) {
-    e->audio_data = audio_data;
+void odc_engine_set_audio_data(struct engine *e, void *audio_data) {
+  e->audio_data = audio_data;
 }
 
-void * engine_get_audio_data(struct engine *e) {
-  return e->audio_data;
-}
+void *odc_engine_get_audio_data(struct engine *e) { return e->audio_data; }
 
-int engine_get_fps(struct engine *e) { return e->fps; }
+int odc_engine_get_fps(struct engine *e) { return e->fps; }

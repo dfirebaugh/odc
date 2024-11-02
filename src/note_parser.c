@@ -4,17 +4,17 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "audio.h"
-#include "oscillator.h"
+#include "odc_audio.h"
+#include "odc_oscillator.h"
 
 #define DEFAULT_TEMPO 120
 
 typedef struct {
   const char *name;
   float frequency;
-} NoteFrequency;
+} note_frequency;
 
-static NoteFrequency note_frequencies[] = {
+static note_frequency note_frequencies[] = {
     {"C0", 16.35},    {"C#0", 17.32},   {"D0", 18.35},    {"D#0", 19.45},
     {"E0", 20.60},    {"F0", 21.83},    {"F#0", 23.12},   {"G0", 24.50},
     {"G#0", 25.96},   {"A0", 27.50},    {"A#0", 29.14},   {"B0", 30.87},
@@ -54,16 +54,16 @@ static NoteFrequency note_frequencies[] = {
     {"REST", -1.0},   {NULL, 0.0}};
 
 static float get_frequency_static(const char *note_name);
-static int get_waveform_static(const char *waveform_name);
-static EffectType get_effect_static(const char *effect_name);
+static waveform_type get_waveform_static(const char *waveform_name);
+static effect_type get_effect_static(const char *effect_name);
 static void parse_tempo_directive(const char *line, float *tempo);
 static void parse_define_directive(const char *line);
-static void parse_note_line(const char *line, float tempo, Note ***sequences,
-                            int *num_notes);
-static void initialize_sequences(Note ***sequences, int **num_notes);
+static void parse_note_line(const char *line, float tempo,
+                            oscillator_note ***sequences, int *num_notes);
+static void initialize_sequences(oscillator_note ***sequences, int **num_notes);
 
-void parse_notes_from_file(const char *filename, Note ***sequences,
-                           int **num_notes) {
+void odc_parse_notes_from_file(const char *filename,
+                               oscillator_note ***sequences, int **num_notes) {
   FILE *file = fopen(filename, "r");
   if (!file) {
     fprintf(stderr, "Failed to open notes file: %s\n", filename);
@@ -95,8 +95,9 @@ void parse_notes_from_file(const char *filename, Note ***sequences,
   fclose(file);
 }
 
-static void initialize_sequences(Note ***sequences, int **num_notes) {
-  *sequences = malloc(NUM_CHANNELS * sizeof(Note *));
+static void initialize_sequences(oscillator_note ***sequences,
+                                 int **num_notes) {
+  *sequences = malloc(NUM_CHANNELS * sizeof(oscillator_note *));
   if (!*sequences) {
     fprintf(stderr, "Memory allocation failed for sequences.\n");
     exit(EXIT_FAILURE);
@@ -124,7 +125,7 @@ static float get_frequency_static(const char *note_name) {
   return -1.0f;
 }
 
-static int get_waveform_static(const char *waveform_name) {
+static waveform_type get_waveform_static(const char *waveform_name) {
   if (strcasecmp(waveform_name, "SINE") == 0)
     return WAVEFORM_SINE;
   else if (strcasecmp(waveform_name, "SQUARE") == 0)
@@ -142,7 +143,7 @@ static int get_waveform_static(const char *waveform_name) {
   }
 }
 
-static EffectType get_effect_static(const char *effect_name) {
+static effect_type get_effect_static(const char *effect_name) {
   if (strcasecmp(effect_name, "NONE") == 0)
     return EFFECT_NONE;
   else if (strcasecmp(effect_name, "SWEEP_UP") == 0)
@@ -166,7 +167,7 @@ static void parse_tempo_directive(const char *line, float *tempo) {
 }
 
 static void parse_define_directive(const char *line) {
-  if (num_custom_waveforms >= MAX_CUSTOM_WAVEFORMS) {
+  if (odc_num_custom_waveforms >= MAX_CUSTOM_WAVEFORMS) {
     fprintf(stderr, "Maximum number of custom waveforms reached.\n");
     return;
   }
@@ -217,7 +218,8 @@ static void parse_define_directive(const char *line) {
   }
 
   if (num_samples > 0) {
-    CustomWaveform *waveform = &custom_waveforms[num_custom_waveforms++];
+    custom_waveform *waveform =
+        &odc_custom_waveforms[odc_num_custom_waveforms++];
     strncpy(waveform->name, waveform_name, 15);
     waveform->name[15] = '\0';
     waveform->samples = samples;
@@ -232,8 +234,8 @@ static void parse_define_directive(const char *line) {
   free(copy_line);
 }
 
-static void parse_note_line(const char *line, float tempo, Note ***sequences,
-                            int *num_notes) {
+static void parse_note_line(const char *line, float tempo,
+                            oscillator_note ***sequences, int *num_notes) {
   int channel;
   char note_name[16];
   char note_length_str[16];
@@ -259,7 +261,7 @@ static void parse_note_line(const char *line, float tempo, Note ***sequences,
 
   float freq = get_frequency_static(note_name);
   int waveform = get_waveform_static(waveform_name);
-  EffectType effect = get_effect_static(effect_name);
+  effect_type effect = get_effect_static(effect_name);
 
   float duration = 0.0f;
   int numerator, denominator;
@@ -276,7 +278,8 @@ static void parse_note_line(const char *line, float tempo, Note ***sequences,
   }
 
   int n = num_notes[channel];
-  Note *temp = realloc((*sequences)[channel], (n + 1) * sizeof(Note));
+  oscillator_note *temp =
+      realloc((*sequences)[channel], (n + 1) * sizeof(oscillator_note));
   if (!temp) {
     fprintf(stderr, "Memory allocation failed for channel %d notes.\n",
             channel);
@@ -284,7 +287,7 @@ static void parse_note_line(const char *line, float tempo, Note ***sequences,
   }
   (*sequences)[channel] = temp;
 
-  Note *note = &((*sequences)[channel][n]);
+  oscillator_note *note = &((*sequences)[channel][n]);
   note->freq = freq;
   note->duration = duration;
   note->attack = attack;

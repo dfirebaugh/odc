@@ -12,11 +12,12 @@ This project uses opengl and glfw
 apt-get install libglfw3
 apt-get install libglfw3-dev
 apt-get install portaudio19-dev
+apt-get install libfreetype6-dev
 ```
 
 ```bash
 make
-./build/demo
+./build/example
 ```
 
 ### Reference
