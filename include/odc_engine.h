@@ -27,5 +27,6 @@ ODC_API void odc_engine_destroy(struct engine *e);
 ODC_API struct GLFWwindow *odc_engine_get_window(struct engine *e);
 ODC_API struct renderer *odc_engine_get_renderer(struct engine *e);
 ODC_API int odc_engine_get_fps(struct engine *e);
+ODC_API void odc_engine_set_window_title(struct engine *e, const char *title);
 
 #endif // ODC_ENGINE_H

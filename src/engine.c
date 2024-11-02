@@ -168,3 +168,9 @@ void odc_engine_set_audio_data(struct engine *e, void *audio_data) {
 void *odc_engine_get_audio_data(struct engine *e) { return e->audio_data; }
 
 int odc_engine_get_fps(struct engine *e) { return e->fps; }
+
+void odc_engine_set_window_title(struct engine *e, const char *title) {
+  if (e && e->window) {
+    glfwSetWindowTitle(e->window, title);
+  }
+}
