@@ -12,7 +12,7 @@ RESOLVED_HEADER = $(BUILD_INCLUDE_DIR)/odc_resolved.h
 CORE_SRC = external/glad/glad.c src/debug.c src/engine.c src/renderer.c src/shader.c src/input.c src/font.c src/oscillator.c src/audio.c src/note_parser.c
 CORE_OBJ = $(CORE_SRC:%.c=$(OBJ_DIR)/%.o)
 
-LIBRARY = $(LIB_DIR)/libengine.so
+LIBRARY = $(LIB_DIR)/libodc.so
 
 BUDDYMARK_SRC = $(EXAMPLES_DIR)/buddymark.c
 EXAMPLE_SRC = $(EXAMPLES_DIR)/example.c
@@ -47,16 +47,16 @@ $(OBJ_DIR)/%.o: %.c | $(BUILD_DIR) $(OBJ_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(BUDDYMARK_EXEC): $(BUDDYMARK_OBJ) $(LIBRARY)
-	$(CC) -o $@ $^ -L$(LIB_DIR) -lengine $(LDFLAGS)
+	$(CC) -o $@ $^ -L$(LIB_DIR) -lodc $(LDFLAGS)
 
 $(EXAMPLE_EXEC): $(EXAMPLE_OBJ) $(LIBRARY)
-	$(CC) -o $@ $^ -L$(LIB_DIR) -lengine $(LDFLAGS)
+	$(CC) -o $@ $^ -L$(LIB_DIR) -lodc $(LDFLAGS)
 
 $(SOUND_EXAMPLE_EXEC): $(SOUND_EXAMPLE_OBJ) $(LIBRARY)
-	$(CC) -o $@ $^ -L$(LIB_DIR) -lengine $(LDFLAGS)
+	$(CC) -o $@ $^ -L$(LIB_DIR) -lodc $(LDFLAGS)
 
 $(GOL_EXAMPLE_EXEC): $(GOL_EXAMPLE_OBJ) $(LIBRARY)
-	$(CC) -o $@ $^ -L$(LIB_DIR) -lengine $(LDFLAGS)
+	$(CC) -o $@ $^ -L$(LIB_DIR) -lodc $(LDFLAGS)
 
 buddymark: $(BUILD_DIR) $(OBJ_DIR) $(BUDDYMARK_EXEC)
 example: $(BUILD_DIR) $(OBJ_DIR) $(EXAMPLE_EXEC)
