@@ -82,9 +82,7 @@ struct engine *odc_engine_new(int width, int height) {
     free(e);
     return NULL;
   }
-  odc_renderer_init(
-      e->renderer,
-      "./assets/fonts/ComicShannsMono/ComicShannsMonoNerdFont-Bold.otf");
+  odc_renderer_init(e->renderer);
 
   e->fps = 0;
 

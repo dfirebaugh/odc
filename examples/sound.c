@@ -149,6 +149,10 @@ int main() {
     return -1;
   }
 
+  const char *font_path =
+      "./assets/fonts/ComicShannsMono/ComicShannsMonoNerdFont-Bold.otf";
+  odc_renderer_load_font(odc_engine_get_renderer(e), font_path);
+
   int app_running = 1;
 
   odc_audio_data ad;

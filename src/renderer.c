@@ -164,7 +164,7 @@ struct renderer *odc_renderer_new() {
   return (struct renderer *)malloc(sizeof(struct renderer));
 }
 
-void odc_renderer_init(struct renderer *renderer, const char *font_path) {
+void odc_renderer_init(struct renderer *renderer) {
   if (!renderer) {
     fprintf(stderr, "Renderer pointer is null\n");
     return;
@@ -242,11 +242,6 @@ void odc_renderer_init(struct renderer *renderer, const char *font_path) {
 
   glBindBuffer(GL_ARRAY_BUFFER, 0);
   glBindVertexArray(0);
-
-  if (odc_font_load(font_path, &renderer->font) != 0) {
-    fprintf(stderr, "Failed to load font\n");
-    return;
-  }
 }
 
 GLuint odc_renderer_get_shader(struct renderer *renderer) {
@@ -641,6 +636,12 @@ void odc_renderer_add_texture(struct renderer *renderer,
   }
 
   renderer->shape_count++;
+}
+
+void odc_renderer_load_font(struct renderer *r, const char *font_path) {
+  if (odc_font_load(font_path, &r->font) != 0) {
+    fprintf(stderr, "Failed to load font\n");
+  }
 }
 
 void odc_renderer_upload_texture_atlas(struct renderer *renderer,

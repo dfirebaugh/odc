@@ -196,6 +196,8 @@ int main() {
     fprintf(stderr, "Failed to load texture: %s\n", file_path);
     return 1;
   }
+  const char *font_path = "./assets/fonts/ComicShannsMono/ComicShannsMonoNerdFont-Bold.otf";
+  odc_renderer_load_font(odc_engine_get_renderer(e), font_path);
   flip_image_vertically(data, width, height, channels);
   odc_renderer_upload_texture_atlas(odc_engine_get_renderer(e), data, width,
                                     height);
