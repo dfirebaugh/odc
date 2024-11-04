@@ -12,6 +12,11 @@
 
 #define ATLAS_WIDTH 512
 #define ATLAS_HEIGHT 512
+#define MAX_TEXTURES 100
+
+struct texture {
+  GLuint id;
+};
 
 struct vertex {
   float fs_quad_pos[2];
@@ -28,11 +33,12 @@ struct vertex {
 
 struct renderer {
   struct vertex vertices[MAX_SHAPES * 6];
+  struct texture textures[MAX_TEXTURES];
+  int texture_count;
   unsigned int VAO, VBO;
   int shape_count;
   GLuint shader_program;
   struct font font;
-  GLuint atlas_id;
 };
 
 void check_gl_errors() {
@@ -101,7 +107,7 @@ const char *fragmentShaderSource =
 
     "out vec4 fragColor;\n"
 
-    "uniform sampler2D text;\n"
+    "uniform sampler2D font_sampler;\n"
     "uniform sampler2D texture_sampler;\n"
 
     "const float OP_CODE_CIRCLE = 1.0;\n"
@@ -153,7 +159,7 @@ const char *fragmentShaderSource =
     "    } else if (op_code == OP_CODE_REGULAR_TRIANGLE) {\n"
     "        fragColor = color;\n"
     "    } else if (op_code == OP_CODE_TEXT) {\n"
-    "        float sampled = texture(text, tex_coord).r;\n"
+    "        float sampled = texture(font_sampler, tex_coord).r;\n"
     "        fragColor = vec4(color.rgb, sampled);\n"
     "    } else if (op_code == OP_CODE_TEXTURE) {\n"
     "        fragColor = texture(texture_sampler, tex_coord);\n"
@@ -252,39 +258,41 @@ void odc_renderer_reset_shape_count(struct renderer *renderer) {
   renderer->shape_count = 0;
 }
 
+
 void odc_renderer_draw(struct renderer *renderer) {
-  check_gl_errors();
+    check_gl_errors();
 
-  glUseProgram(renderer->shader_program);
+    glUseProgram(renderer->shader_program);
 
-  int screen_width, screen_height;
-  glfwGetFramebufferSize(glfwGetCurrentContext(), &screen_width,
-                         &screen_height);
-  glUniform2f(glGetUniformLocation(renderer->shader_program, "u_resolution"),
-              (float)screen_width, (float)screen_height);
+    int screen_width, screen_height;
+    glfwGetFramebufferSize(glfwGetCurrentContext(), &screen_width, &screen_height);
+    glUniform2f(glGetUniformLocation(renderer->shader_program, "u_resolution"),
+                (float)screen_width, (float)screen_height);
 
-  glBindVertexArray(renderer->VAO);
-  check_gl_errors();
+    glBindVertexArray(renderer->VAO);
+    check_gl_errors();
 
-  glBindBuffer(GL_ARRAY_BUFFER, renderer->VBO);
-  glBufferSubData(GL_ARRAY_BUFFER, 0,
-                  sizeof(struct vertex) * renderer->shape_count * 6,
-                  renderer->vertices);
-  check_gl_errors();
+    glBindBuffer(GL_ARRAY_BUFFER, renderer->VBO);
+    glBufferSubData(GL_ARRAY_BUFFER, 0,
+                    sizeof(struct vertex) * renderer->shape_count * 6,
+                    renderer->vertices);
+    check_gl_errors();
 
-  glActiveTexture(GL_TEXTURE0);
-  glBindTexture(GL_TEXTURE_2D, renderer->font.texture_id);
-  glUniform1i(glGetUniformLocation(renderer->shader_program, "text"), 0);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, renderer->font.texture_id);
+    glUniform1i(glGetUniformLocation(renderer->shader_program, "font_sampler"), 0);
 
-  glActiveTexture(GL_TEXTURE1);
-  glBindTexture(GL_TEXTURE_2D, renderer->atlas_id);
-  glUniform1i(glGetUniformLocation(renderer->shader_program, "texture_sampler"),
-              1);
+    for (int i = 0; i < renderer->texture_count; ++i) {
+        glActiveTexture(GL_TEXTURE1 + i);
+        glBindTexture(GL_TEXTURE_2D, renderer->textures[i].id);
+    }
 
-  glDrawArrays(GL_TRIANGLES, 0, renderer->shape_count * 6);
-  check_gl_errors();
+    glUniform1i(glGetUniformLocation(renderer->shader_program, "texture_sampler"), 1);
 
-  glBindVertexArray(0);
+    glDrawArrays(GL_TRIANGLES, 0, renderer->shape_count * 6);
+    check_gl_errors();
+
+    glBindVertexArray(0);
 }
 
 void odc_renderer_clear_vertices(struct renderer *renderer) {
@@ -297,8 +305,9 @@ void odc_renderer_clear(struct renderer *renderer, float r, float g, float b,
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 }
 
-void normalize_coordinates(float x, float y, int screen_width,
-                           int screen_height, float *norm_x, float *norm_y) {
+static void normalize_coordinates(float x, float y, int screen_width,
+                                  int screen_height, float *norm_x,
+                                  float *norm_y) {
   *norm_x = (x / (float)screen_width) * 2.0f - 1.0f;
   *norm_y = 1.0f - (y / (float)screen_height) * 2.0f;
 }
@@ -566,7 +575,7 @@ void odc_renderer_add_multiline_text(struct renderer *renderer,
   free(line);
 }
 
-void odc_renderer_add_texture(struct renderer *renderer,
+void odc_renderer_add_texture(struct renderer *renderer, GLuint texture_handle,
                               struct texture_render_options *options) {
   if (renderer->shape_count >= MAX_SHAPES)
     return;
@@ -636,6 +645,7 @@ void odc_renderer_add_texture(struct renderer *renderer,
   }
 
   renderer->shape_count++;
+  renderer->textures[renderer->texture_count - 1].id = texture_handle;
 }
 
 void odc_renderer_load_font(struct renderer *r, const char *font_path) {
@@ -644,14 +654,25 @@ void odc_renderer_load_font(struct renderer *r, const char *font_path) {
   }
 }
 
-void odc_renderer_upload_texture_atlas(struct renderer *renderer,
-                                       const unsigned char *data, int width,
-                                       int height) {
-  glGenTextures(1, &renderer->atlas_id);
-  glBindTexture(GL_TEXTURE_2D, renderer->atlas_id);
+GLuint odc_renderer_upload_texture(struct renderer *renderer,
+                                   const unsigned char *data, int width,
+                                   int height) {
+  if (renderer->texture_count >= MAX_TEXTURES) {
+    fprintf(stderr, "Maximum texture limit reached\n");
+    return 0;
+  }
+
+  GLuint texture_id;
+  glGenTextures(1, &texture_id);
+  glBindTexture(GL_TEXTURE_2D, texture_id);
   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA,
                GL_UNSIGNED_BYTE, data);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
   glBindTexture(GL_TEXTURE_2D, 0);
+
+  renderer->textures[renderer->texture_count].id = texture_id;
+  renderer->texture_count++;
+
+  return texture_id;
 }

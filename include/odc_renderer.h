@@ -4,7 +4,6 @@
 #include "glad.h"
 
 #include "odc.h"
-#include "odc_font.h"
 
 #define ATTRIB_POS_LOCATION 0
 #define ATTRIB_SHAPE_POS_LOCATION 1
@@ -76,6 +75,7 @@ ODC_API void odc_renderer_add_text(struct renderer *renderer, const char *text,
                                    float *color);
 
 ODC_API void odc_renderer_add_texture(struct renderer *renderer,
+                                      GLuint texture_handle,
                                       struct texture_render_options *options);
 ODC_API void odc_renderer_add_multiline_text(struct renderer *renderer,
                                              const char *text, float x, float y,
@@ -83,9 +83,9 @@ ODC_API void odc_renderer_add_multiline_text(struct renderer *renderer,
                                              int screen_height, float *color);
 
 ODC_API void odc_renderer_load_font(struct renderer *r, const char *font_path);
-ODC_API void odc_renderer_upload_texture_atlas(struct renderer *renderer,
-                                               const unsigned char *data,
-                                               int width, int height);
+ODC_API GLuint odc_renderer_upload_texture(struct renderer *renderer,
+                                           const unsigned char *data, int width,
+                                           int height);
 ODC_API void check_gl_errors();
 
 #endif // ODC_RENDERER_H
