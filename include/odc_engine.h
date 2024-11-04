@@ -6,9 +6,8 @@
 struct engine;
 struct renderer;
 
-typedef void (*update_callback_t)(struct engine *e, struct renderer *renderer,
-                                  double delta_time);
-typedef void (*render_callback_t)(struct engine *e, struct renderer *renderer);
+typedef void (*update_callback_t)(struct engine *e);
+typedef void (*render_callback_t)(struct engine *e);
 
 ODC_API struct engine *odc_engine_new(int width, int height);
 ODC_API void odc_engine_run(struct engine *e);

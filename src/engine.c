@@ -19,7 +19,8 @@ struct engine {
   int fps;
 };
 
-void framebuffer_size_callback(GLFWwindow *window, int width, int height) {
+static void framebuffer_size_callback(GLFWwindow *window, int width,
+                                      int height) {
   glViewport(0, 0, width, height);
 }
 
@@ -130,11 +131,11 @@ void odc_engine_run(struct engine *e) {
     lastTime = currentTime;
 
     if (e->update_callback) {
-      e->update_callback(e, e->renderer, deltaTime);
+      e->update_callback(e);
     }
 
     if (e->render_callback) {
-      e->render_callback(e, e->renderer);
+      e->render_callback(e);
     }
 
     frameCount++;
