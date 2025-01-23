@@ -8,7 +8,7 @@
 /*ODC_API waveform_type odc_get_waveform(const char *waveform_name);*/
 /*ODC_API effect_type odc_get_effect(const char *effect_name);*/
 ODC_API void odc_parse_notes_from_file(const char *filename,
-                                       oscillator_note ***sequences,
-                                       int **num_notes);
+				       oscillator_note ***sequences,
+				       int **num_notes);
 
 #endif // NOTE_PARSER_H

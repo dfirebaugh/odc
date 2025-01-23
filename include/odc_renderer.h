@@ -27,20 +27,20 @@
 struct renderer;
 
 struct texture_render_options {
-  float x;
-  float y;
-  float width;
-  float height;
-  float rect_x;
-  float rect_y;
-  float rect_width;
-  float rect_height;
-  int screen_width;
-  int screen_height;
-  int flip_x;
-  int flip_y;
-  float scale;
-  float rotation;
+	float x;
+	float y;
+	float width;
+	float height;
+	float rect_x;
+	float rect_y;
+	float rect_width;
+	float rect_height;
+	int screen_width;
+	int screen_height;
+	int flip_x;
+	int flip_y;
+	float scale;
+	float rotation;
 };
 
 ODC_API struct renderer *odc_renderer_new();
@@ -48,44 +48,55 @@ ODC_API void odc_renderer_init(struct renderer *renderer);
 ODC_API void odc_renderer_destroy(struct renderer *renderer);
 ODC_API void odc_renderer_draw(struct renderer *renderer);
 ODC_API void odc_renderer_clear(struct renderer *renderer, float r, float g,
-                                float b, float a);
+				float b, float a);
 ODC_API void odc_renderer_clear_vertices(struct renderer *renderer);
 ODC_API void odc_renderer_reset_shape_count(struct renderer *renderer);
 ODC_API GLuint odc_renderer_get_shader(struct renderer *renderer);
 
 ODC_API void odc_renderer_add_circle(struct renderer *renderer, float x,
-                                     float y, float radius, int screen_width,
-                                     int screen_height, float *color);
+				     float y, float radius, int screen_width,
+				     int screen_height, float *color);
+ODC_API void odc_renderer_add_rect(struct renderer *renderer, float x, float y,
+				   float width, float height, int screen_width,
+				   int screen_height, float *color);
 ODC_API void odc_renderer_add_rounded_rect(struct renderer *renderer, float x,
-                                           float y, float width, float height,
-                                           float radius, int screen_width,
-                                           int screen_height, float *color);
+					   float y, float width, float height,
+					   float radius, int screen_width,
+					   int screen_height, float *color);
 ODC_API void odc_renderer_add_equilateral_triangle(struct renderer *renderer,
-                                                   float x, float y, float size,
-                                                   int screen_width,
-                                                   int screen_height,
-                                                   float *color);
+						   float x, float y, float size,
+						   int screen_width,
+						   int screen_height,
+						   float *color);
 ODC_API void odc_renderer_add_triangle(struct renderer *renderer, float x1,
-                                       float y1, float x2, float y2, float x3,
-                                       float y3, int screen_width,
-                                       int screen_height, float *color);
+				       float y1, float x2, float y2, float x3,
+				       float y3, int screen_width,
+				       int screen_height, float *color);
 ODC_API void odc_renderer_add_text(struct renderer *renderer, const char *text,
-                                   float x, float y, float scale,
-                                   int screen_width, int screen_height,
-                                   float *color);
+				   float x, float y, float scale,
+				   int screen_width, int screen_height,
+				   float *color);
 
 ODC_API void odc_renderer_add_texture(struct renderer *renderer,
-                                      GLuint texture_handle,
-                                      struct texture_render_options *options);
+				      GLuint texture_handle,
+				      struct texture_render_options *options);
 ODC_API void odc_renderer_add_multiline_text(struct renderer *renderer,
-                                             const char *text, float x, float y,
-                                             float scale, int screen_width,
-                                             int screen_height, float *color);
+					     const char *text, float x, float y,
+					     float scale, int screen_width,
+					     int screen_height, float *color);
 
 ODC_API void odc_renderer_load_font(struct renderer *r, const char *font_path);
 ODC_API GLuint odc_renderer_upload_texture(struct renderer *renderer,
-                                           const unsigned char *data, int width,
-                                           int height);
+					   const unsigned char *data, int width,
+					   int height);
+ODC_API void odc_renderer_add_line(struct renderer *renderer, float x1,
+				   float y1, float x2, float y2, float width,
+				   int screen_width, int screen_height,
+				   float *color);
+ODC_API void odc_renderer_update_texture(GLuint texture_id,
+					 const unsigned char *data, int x,
+					 int y, int width, int height);
+
 ODC_API void check_gl_errors();
 
 #endif // ODC_RENDERER_H

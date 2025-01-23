@@ -5,9 +5,9 @@
 #include "odc.h"
 
 ODC_API GLuint odc_shader_new_program(const char *vertexShaderSource,
-                                      const char *fragmentShaderSource,
-                                      char *error);
+				      const char *fragmentShaderSource,
+				      char *error);
 ODC_API GLuint odc_shader_compile_shader(const char *source, GLenum shaderType,
-                                         char *error);
+					 char *error);
 
 #endif // SHADER_H
