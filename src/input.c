@@ -36,8 +36,8 @@ void odc_input_update(struct engine *e)
 	odc_update_key_states(window);
 }
 
-void odc_handle_mouse_click(GLFWwindow *window, int button, int action,
-			    int mods)
+void odc_handle_mouse_click(
+	GLFWwindow *window, int button, int action, int mods)
 {
 	double xpos, ypos;
 	glfwGetCursorPos(window, &xpos, &ypos);
@@ -57,8 +57,8 @@ void odc_handle_mouse_click(GLFWwindow *window, int button, int action,
 	}
 }
 
-void odc_handle_mouse_movement_callback(GLFWwindow *window, double xpos,
-					double ypos)
+void odc_handle_mouse_movement_callback(
+	GLFWwindow *window, double xpos, double ypos)
 {
 	struct camera *cam = glfwGetWindowUserPointer(window);
 	if (mouseCaptured) {
@@ -110,4 +110,14 @@ int odc_is_mouse_button_just_pressed(GLFWwindow *window, int button)
 			glfwGetMouseButton(window, button) == GLFW_PRESS;
 	}
 	return 0;
+}
+
+int odc_is_button_pressed(GLFWwindow *window, int key)
+{
+	return glfwGetKey(window, key) == GLFW_PRESS;
+}
+
+int odc_is_mouse_button_pressed(GLFWwindow *window, int button)
+{
+	return glfwGetMouseButton(window, button) == GLFW_PRESS;
 }

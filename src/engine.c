@@ -61,22 +61,21 @@ struct engine *odc_engine_new(int width, int height, int fullscreen)
 		e->monitor = glfwGetPrimaryMonitor();
 		if (e->monitor) {
 			e->original_vidmode = glfwGetVideoMode(e->monitor);
-			glfwWindowHint(GLFW_RED_BITS,
-				       e->original_vidmode->redBits);
+			glfwWindowHint(
+				GLFW_RED_BITS, e->original_vidmode->redBits);
 			glfwWindowHint(GLFW_GREEN_BITS,
-				       e->original_vidmode->greenBits);
-			glfwWindowHint(GLFW_BLUE_BITS,
-				       e->original_vidmode->blueBits);
+				e->original_vidmode->greenBits);
+			glfwWindowHint(
+				GLFW_BLUE_BITS, e->original_vidmode->blueBits);
 			glfwWindowHint(GLFW_REFRESH_RATE,
-				       e->original_vidmode->refreshRate);
-			e->window =
-				glfwCreateWindow(e->original_vidmode->width,
-						 e->original_vidmode->height,
-						 "odc", e->monitor, NULL);
+				e->original_vidmode->refreshRate);
+			e->window = glfwCreateWindow(e->original_vidmode->width,
+				e->original_vidmode->height, "odc", e->monitor,
+				NULL);
 		}
 	} else {
-		e->window = glfwCreateWindow(e->window_width, e->window_height,
-					     "odc", NULL, NULL);
+		e->window = glfwCreateWindow(
+			e->window_width, e->window_height, "odc", NULL, NULL);
 	}
 
 	if (!e->window) {
@@ -125,9 +124,9 @@ void odc_engine_destroy(struct engine *e)
 		}
 		if (e->monitor && e->original_vidmode) {
 			glfwSetWindowMonitor(e->window, NULL, 0, 0,
-					     e->original_vidmode->width,
-					     e->original_vidmode->height,
-					     e->original_vidmode->refreshRate);
+				e->original_vidmode->width,
+				e->original_vidmode->height,
+				e->original_vidmode->refreshRate);
 		}
 		free(e);
 	}
@@ -191,14 +190,14 @@ void odc_engine_run(struct engine *e)
 	}
 }
 
-void odc_engine_set_update_callback(struct engine *e,
-				    update_callback_t callback)
+void odc_engine_set_update_callback(
+	struct engine *e, update_callback_t callback)
 {
 	e->update_callback = callback;
 }
 
-void odc_engine_set_render_callback(struct engine *e,
-				    render_callback_t callback)
+void odc_engine_set_render_callback(
+	struct engine *e, render_callback_t callback)
 {
 	e->render_callback = callback;
 }
@@ -223,4 +222,20 @@ void odc_engine_set_window_title(struct engine *e, const char *title)
 	if (e && e->window) {
 		glfwSetWindowTitle(e->window, title);
 	}
+}
+
+int odc_engine_get_window_height(struct engine *e)
+{
+	GLFWwindow *window = odc_engine_get_window(e);
+	int window_width, window_height;
+	glfwGetFramebufferSize(window, &window_width, &window_height);
+	return window_height;
+}
+
+int odc_engine_get_window_width(struct engine *e)
+{
+	GLFWwindow *window = odc_engine_get_window(e);
+	int window_width, window_height;
+	glfwGetFramebufferSize(window, &window_width, &window_height);
+	return window_width;
 }
